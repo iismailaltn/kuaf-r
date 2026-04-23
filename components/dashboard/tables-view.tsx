@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { Plus, Users, Clock, Scissors } from "lucide-react"
+import { Plus, Users, Clock, Scissors, X, Pencil, Trash2, Save, MapPin } from "lucide-react"
 
 interface Table {
   id: number
@@ -332,45 +332,100 @@ export function TablesView({ canManage = false }: TablesViewProps) {
         })}
       </div>
 
-      {canManage && editingTableId !== null && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-          <div className="w-full max-w-md rounded-2xl border border-border bg-card p-5 space-y-4 shadow-xl">
-            <h2 className="text-lg font-semibold text-foreground">Calisma Alani Duzenle</h2>
-            <div className="space-y-2">
-              <label className="text-sm text-muted-foreground">Calisma alani adi</label>
-              <input
-                value={editingName}
-                onChange={(e) => setEditingName(e.target.value)}
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/40"
-                placeholder="Orn: Calisma Alani 1"
-              />
+      {canManage && editingTableId !== null && (() => {
+        const currentTable = tables.find(t => t.id === editingTableId)
+        const currentStatus = currentTable?.status ?? "available"
+        const statusInfo = statusConfig[currentStatus]
+        return (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="w-full max-w-md bg-card rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+              {/* Header with gradient */}
+              <div className="relative bg-gradient-to-br from-primary/90 to-primary px-6 py-5">
+                <button
+                  onClick={closeEditCard}
+                  className="absolute top-4 right-4 p-1.5 rounded-full bg-white/20 hover:bg-white/30 transition-colors"
+                >
+                  <X className="w-4 h-4 text-white" />
+                </button>
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center">
+                    <Pencil className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-semibold text-white">Calisma Alani Duzenle</h2>
+                    <p className="text-sm text-white/70">Bilgileri guncelleyin</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Content */}
+              <div className="p-6 space-y-5">
+                {/* Current Status Badge */}
+                <div className="flex items-center justify-between p-3 rounded-xl bg-muted/50">
+                  <div className="flex items-center gap-2">
+                    <MapPin className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">Mevcut Durum</span>
+                  </div>
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      "text-xs font-medium",
+                      currentStatus === "available" && "bg-green-100 text-green-700 border-green-300",
+                      currentStatus === "occupied" && "bg-blue-100 text-blue-700 border-blue-300",
+                      currentStatus === "reserved" && "bg-blue-100 text-blue-700 border-blue-300",
+                      currentStatus === "cleaning" && "bg-orange-100 text-orange-700 border-orange-300"
+                    )}
+                  >
+                    {statusInfo.label}
+                  </Badge>
+                </div>
+
+                {/* Name Input */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">Calisma Alani Adi</label>
+                  <div className="relative">
+                    <input
+                      value={editingName}
+                      onChange={(e) => setEditingName(e.target.value)}
+                      className="w-full rounded-xl border-2 border-border bg-background px-4 py-3 text-sm outline-none transition-all focus:border-primary focus:ring-4 focus:ring-primary/10"
+                      placeholder="Orn: Calisma Alani 1"
+                    />
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="space-y-3 pt-2">
+                  <Button
+                    className="w-full h-12 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-medium gap-2 shadow-lg shadow-primary/25 transition-all hover:shadow-xl hover:shadow-primary/30"
+                    onClick={handleRenameWorkspace}
+                  >
+                    <Save className="w-4 h-4" />
+                    Degisiklikleri Kaydet
+                  </Button>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    <Button
+                      variant="outline"
+                      className="h-11 rounded-xl border-2 hover:bg-muted/50 font-medium transition-all"
+                      onClick={closeEditCard}
+                    >
+                      Vazgec
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="h-11 rounded-xl border-2 border-red-200 bg-red-50 text-red-600 hover:bg-red-100 hover:border-red-300 font-medium gap-2 transition-all"
+                      onClick={handleRemoveWorkspace}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Sil
+                    </Button>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              <Button
-                variant="outline"
-                className="rounded-lg bg-green-600 text-white border-green-600 hover:bg-green-700 hover:text-white"
-                onClick={handleRenameWorkspace}
-              >
-                Kaydet
-              </Button>
-              <Button
-                variant="outline"
-                className="rounded-lg bg-red-600 text-white border-red-600 hover:bg-red-700 hover:text-white"
-                onClick={handleRemoveWorkspace}
-              >
-                Calisma alanini kaldir
-              </Button>
-            </div>
-            <Button
-              variant="outline"
-              className="w-full rounded-lg bg-blue-600 text-white border-blue-600 hover:bg-blue-700 hover:text-white"
-              onClick={closeEditCard}
-            >
-              Vazgec
-            </Button>
           </div>
-        </div>
-      )}
+        )
+      })()}
     </div>
   )
 }
