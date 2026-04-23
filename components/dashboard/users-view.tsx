@@ -4,6 +4,7 @@ import { useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import {
   Select,
   SelectContent,
@@ -16,96 +17,103 @@ import {
   Search,
   Plus,
   MoreHorizontal,
-  Mail,
   Phone,
-  Shield,
-  ShieldCheck,
-  User,
   Edit3,
   Trash2,
   X,
   UserCheck,
   UserX,
   Users,
-  Crown,
+  Scissors,
+  Clock,
+  Calendar,
+  Briefcase,
+  Star,
+  Save,
 } from "lucide-react"
 
-interface UserData {
+interface EmployeeData {
   id: string
   name: string
-  email: string
   phone: string
-  role: "admin" | "supervisor" | "user"
+  specialty: string[]
+  workingHours: string
+  startDate: string
   status: "aktif" | "pasif"
-  joinedDate: string
-  avatar?: string
+  experience: string
+  notes: string
 }
 
-const initialUsers: UserData[] = [
-  {
-    id: "USR001",
-    name: "Ahmet Yilmaz",
-    email: "ahmet@restaurant.com",
-    phone: "+90 555 123 4567",
-    role: "admin",
-    status: "aktif",
-    joinedDate: "2024-01-15",
-  },
-  {
-    id: "USR002",
-    name: "Ayse Kaya",
-    email: "ayse@restaurant.com",
-    phone: "+90 555 234 5678",
-    role: "supervisor",
-    status: "aktif",
-    joinedDate: "2024-02-20",
-  },
-  {
-    id: "USR003",
-    name: "Mehmet Demir",
-    email: "mehmet@restaurant.com",
-    phone: "+90 555 345 6789",
-    role: "user",
-    status: "aktif",
-    joinedDate: "2024-03-10",
-  },
-  {
-    id: "USR004",
-    name: "Fatma Celik",
-    email: "fatma@restaurant.com",
-    phone: "+90 555 456 7890",
-    role: "user",
-    status: "pasif",
-    joinedDate: "2024-03-25",
-  },
-  {
-    id: "USR005",
-    name: "Ali Ozturk",
-    email: "ali@restaurant.com",
-    phone: "+90 555 567 8901",
-    role: "user",
-    status: "aktif",
-    joinedDate: "2024-04-05",
-  },
+const specialtyOptions = [
+  "Sac Kesimi",
+  "Sac Boyama",
+  "Fon",
+  "Manikur",
+  "Pedikur",
+  "Cilt Bakimi",
+  "Makyaj",
+  "Kas Dizayn",
+  "Agda",
+  "Sakal Kesimi",
 ]
 
-const roleConfig = {
-  admin: {
-    label: "Admin",
-    icon: Crown,
-    color: "bg-amber-500/10 text-amber-600 border-amber-200",
+const initialEmployees: EmployeeData[] = [
+  {
+    id: "EMP001",
+    name: "Ahmet Yilmaz",
+    phone: "+90 555 123 4567",
+    specialty: ["Sac Kesimi", "Sakal Kesimi"],
+    workingHours: "09:00 - 18:00",
+    startDate: "2022-01-15",
+    status: "aktif",
+    experience: "5 yil",
+    notes: "Uzman berber, erkek sac kesiminde deneyimli",
   },
-  supervisor: {
-    label: "Supervisor",
-    icon: ShieldCheck,
-    color: "bg-blue-500/10 text-blue-600 border-blue-200",
+  {
+    id: "EMP002",
+    name: "Ayse Kaya",
+    phone: "+90 555 234 5678",
+    specialty: ["Sac Boyama", "Fon", "Makyaj"],
+    workingHours: "10:00 - 19:00",
+    startDate: "2023-03-20",
+    status: "aktif",
+    experience: "3 yil",
+    notes: "Renklendirme uzmani",
   },
-  user: {
-    label: "Kullanici",
-    icon: User,
-    color: "bg-slate-500/10 text-slate-600 border-slate-200",
+  {
+    id: "EMP003",
+    name: "Mehmet Demir",
+    phone: "+90 555 345 6789",
+    specialty: ["Sac Kesimi", "Sac Boyama"],
+    workingHours: "09:00 - 18:00",
+    startDate: "2024-01-10",
+    status: "aktif",
+    experience: "1 yil",
+    notes: "",
   },
-}
+  {
+    id: "EMP004",
+    name: "Fatma Celik",
+    phone: "+90 555 456 7890",
+    specialty: ["Manikur", "Pedikur", "Cilt Bakimi"],
+    workingHours: "10:00 - 18:00",
+    startDate: "2023-06-01",
+    status: "pasif",
+    experience: "4 yil",
+    notes: "Izinli - 15 Ocak'a kadar",
+  },
+  {
+    id: "EMP005",
+    name: "Ali Ozturk",
+    phone: "+90 555 567 8901",
+    specialty: ["Kas Dizayn", "Agda"],
+    workingHours: "11:00 - 20:00",
+    startDate: "2024-02-15",
+    status: "aktif",
+    experience: "2 yil",
+    notes: "",
+  },
+]
 
 const statusConfig = {
   aktif: {
@@ -121,84 +129,112 @@ const statusConfig = {
 }
 
 export function UsersView() {
-  const [users, setUsers] = useState<UserData[]>(initialUsers)
+  const [employees, setEmployees] = useState<EmployeeData[]>(initialEmployees)
   const [searchQuery, setSearchQuery] = useState("")
-  const [filterRole, setFilterRole] = useState<string>("all")
+  const [filterStatus, setFilterStatus] = useState<string>("all")
+  const [filterSpecialty, setFilterSpecialty] = useState<string>("all")
   const [showAddModal, setShowAddModal] = useState(false)
-  const [editingUser, setEditingUser] = useState<UserData | null>(null)
+  const [editingEmployee, setEditingEmployee] = useState<EmployeeData | null>(null)
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
 
   const [formData, setFormData] = useState({
     name: "",
-    email: "",
     phone: "",
-    role: "user" as "admin" | "supervisor" | "user",
+    specialty: [] as string[],
+    workingHours: "",
+    startDate: "",
     status: "aktif" as "aktif" | "pasif",
+    experience: "",
+    notes: "",
   })
 
-  const filteredUsers = users.filter((user) => {
+  const filteredEmployees = employees.filter((employee) => {
     const matchesSearch =
-      user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesRole = filterRole === "all" || user.role === filterRole
-    return matchesSearch && matchesRole
+      employee.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      employee.phone.includes(searchQuery)
+    const matchesStatus = filterStatus === "all" || employee.status === filterStatus
+    const matchesSpecialty = filterSpecialty === "all" || employee.specialty.includes(filterSpecialty)
+    return matchesSearch && matchesStatus && matchesSpecialty
   })
 
   const stats = {
-    total: users.length,
-    active: users.filter((u) => u.status === "aktif").length,
-    admins: users.filter((u) => u.role === "admin").length,
-    supervisors: users.filter((u) => u.role === "supervisor").length,
+    total: employees.length,
+    active: employees.filter((e) => e.status === "aktif").length,
+    passive: employees.filter((e) => e.status === "pasif").length,
   }
 
-  const handleAddUser = () => {
-    if (!formData.name || !formData.email) {
+  const handleAddEmployee = () => {
+    if (!formData.name || !formData.phone) {
       alert("Lutfen zorunlu alanlari doldurun.")
       return
     }
-    const newUser: UserData = {
-      id: `USR${String(users.length + 1).padStart(3, "0")}`,
+    const newEmployee: EmployeeData = {
+      id: `EMP${String(employees.length + 1).padStart(3, "0")}`,
       ...formData,
-      joinedDate: new Date().toISOString().split("T")[0],
+      startDate: formData.startDate || new Date().toISOString().split("T")[0],
     }
-    setUsers([...users, newUser])
-    setFormData({ name: "", email: "", phone: "", role: "user", status: "aktif" })
+    setEmployees([...employees, newEmployee])
+    resetForm()
     setShowAddModal(false)
   }
 
-  const handleEditUser = () => {
-    if (!editingUser || !formData.name || !formData.email) {
+  const handleEditEmployee = () => {
+    if (!editingEmployee || !formData.name || !formData.phone) {
       alert("Lutfen zorunlu alanlari doldurun.")
       return
     }
-    setUsers(
-      users.map((u) =>
-        u.id === editingUser.id
-          ? { ...u, ...formData }
-          : u
+    setEmployees(
+      employees.map((e) =>
+        e.id === editingEmployee.id
+          ? { ...e, ...formData }
+          : e
       )
     )
-    setEditingUser(null)
-    setFormData({ name: "", email: "", phone: "", role: "user", status: "aktif" })
+    setEditingEmployee(null)
+    resetForm()
   }
 
-  const handleDeleteUser = (userId: string) => {
-    if (confirm("Bu kullaniciyi silmek istediginizden emin misiniz?")) {
-      setUsers(users.filter((u) => u.id !== userId))
+  const handleDeleteEmployee = (employeeId: string) => {
+    if (confirm("Bu calisani silmek istediginizden emin misiniz?")) {
+      setEmployees(employees.filter((e) => e.id !== employeeId))
     }
     setOpenMenuId(null)
   }
 
-  const openEditModal = (user: UserData) => {
-    setEditingUser(user)
+  const openEditModal = (employee: EmployeeData) => {
+    setEditingEmployee(employee)
     setFormData({
-      name: user.name,
-      email: user.email,
-      phone: user.phone,
-      role: user.role,
-      status: user.status,
+      name: employee.name,
+      phone: employee.phone,
+      specialty: employee.specialty,
+      workingHours: employee.workingHours,
+      startDate: employee.startDate,
+      status: employee.status,
+      experience: employee.experience,
+      notes: employee.notes,
     })
     setOpenMenuId(null)
+  }
+
+  const resetForm = () => {
+    setFormData({
+      name: "",
+      phone: "",
+      specialty: [],
+      workingHours: "",
+      startDate: "",
+      status: "aktif",
+      experience: "",
+      notes: "",
+    })
+  }
+
+  const toggleSpecialty = (spec: string) => {
+    if (formData.specialty.includes(spec)) {
+      setFormData({ ...formData, specialty: formData.specialty.filter((s) => s !== spec) })
+    } else {
+      setFormData({ ...formData, specialty: [...formData.specialty, spec] })
+    }
   }
 
   const getInitials = (name: string) => {
@@ -214,19 +250,19 @@ export function UsersView() {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">Kullanicilar</h1>
+          <h1 className="text-2xl font-semibold text-foreground">Calisanlar</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Sistem kullanicilarini yonetin ve izinleri duzenleyin
+            Kuafor salonu calisanlarini yonetin
           </p>
         </div>
         <Button className="rounded-xl gap-2" onClick={() => setShowAddModal(true)}>
           <Plus className="w-4 h-4" />
-          Kullanici Ekle
+          Calisan Ekle
         </Button>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-3 gap-4">
         <div className="p-5 bg-card rounded-2xl border border-border">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
@@ -234,7 +270,7 @@ export function UsersView() {
             </div>
             <div>
               <p className="text-2xl font-bold text-foreground">{stats.total}</p>
-              <p className="text-xs text-muted-foreground">Toplam Kullanici</p>
+              <p className="text-xs text-muted-foreground">Toplam Calisan</p>
             </div>
           </div>
         </div>
@@ -245,29 +281,18 @@ export function UsersView() {
             </div>
             <div>
               <p className="text-2xl font-bold text-foreground">{stats.active}</p>
-              <p className="text-xs text-muted-foreground">Aktif Kullanici</p>
+              <p className="text-xs text-muted-foreground">Aktif Calisan</p>
             </div>
           </div>
         </div>
         <div className="p-5 bg-card rounded-2xl border border-border">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center">
-              <Crown className="w-5 h-5 text-amber-600" />
+            <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center">
+              <UserX className="w-5 h-5 text-red-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-foreground">{stats.admins}</p>
-              <p className="text-xs text-muted-foreground">Admin</p>
-            </div>
-          </div>
-        </div>
-        <div className="p-5 bg-card rounded-2xl border border-border">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center">
-              <ShieldCheck className="w-5 h-5 text-blue-600" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-foreground">{stats.supervisors}</p>
-              <p className="text-xs text-muted-foreground">Supervisor</p>
+              <p className="text-2xl font-bold text-foreground">{stats.passive}</p>
+              <p className="text-xs text-muted-foreground">Pasif Calisan</p>
             </div>
           </div>
         </div>
@@ -278,144 +303,180 @@ export function UsersView() {
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
-            placeholder="Kullanici ara..."
+            placeholder="Calisan ara..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10 rounded-xl bg-muted/50 border-0"
           />
         </div>
-        <Select value={filterRole} onValueChange={setFilterRole}>
-          <SelectTrigger className="w-40 rounded-xl">
-            <SelectValue placeholder="Rol filtrele" />
+        <Select value={filterStatus} onValueChange={setFilterStatus}>
+          <SelectTrigger className="w-36 rounded-xl">
+            <SelectValue placeholder="Durum" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Tum Roller</SelectItem>
-            <SelectItem value="admin">Admin</SelectItem>
-            <SelectItem value="supervisor">Supervisor</SelectItem>
-            <SelectItem value="user">Kullanici</SelectItem>
+            <SelectItem value="all">Tum Durum</SelectItem>
+            <SelectItem value="aktif">Aktif</SelectItem>
+            <SelectItem value="pasif">Pasif</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={filterSpecialty} onValueChange={setFilterSpecialty}>
+          <SelectTrigger className="w-44 rounded-xl">
+            <SelectValue placeholder="Uzmanlik" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Tum Uzmanliklar</SelectItem>
+            {specialtyOptions.map((spec) => (
+              <SelectItem key={spec} value={spec}>{spec}</SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>
 
-      {/* User Cards Grid */}
+      {/* Employee Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {filteredUsers.map((user) => {
-          const RoleIcon = roleConfig[user.role].icon
-          const StatusIcon = statusConfig[user.status].icon
+        {filteredEmployees.map((employee) => {
+          const StatusIcon = statusConfig[employee.status].icon
 
           return (
             <div
-              key={user.id}
-              className="group relative p-5 bg-card rounded-2xl border border-border hover:border-primary/30 hover:shadow-lg transition-all duration-300"
+              key={employee.id}
+              className="group relative bg-card rounded-2xl border border-border hover:border-primary/30 hover:shadow-lg transition-all duration-300 overflow-hidden"
             >
-              {/* Menu Button */}
-              <div className="absolute top-4 right-4">
-                <button
-                  onClick={() => setOpenMenuId(openMenuId === user.id ? null : user.id)}
-                  className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-muted transition-all"
-                >
-                  <MoreHorizontal className="w-4 h-4 text-muted-foreground" />
-                </button>
-                {openMenuId === user.id && (
-                  <div className="absolute top-8 right-0 w-36 rounded-xl border border-border bg-popover shadow-xl z-50 p-1.5 animate-in fade-in-0 zoom-in-95">
-                    <button
-                      className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg hover:bg-muted transition-colors"
-                      onClick={() => openEditModal(user)}
-                    >
-                      <Edit3 className="w-3.5 h-3.5" />
-                      Duzenle
-                    </button>
-                    <button
-                      className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg text-red-600 hover:bg-red-50 transition-colors"
-                      onClick={() => handleDeleteUser(user.id)}
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                      Sil
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {/* Avatar & Info */}
-              <div className="flex items-start gap-4">
-                <div className="relative">
-                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center text-lg font-semibold text-primary">
-                    {getInitials(user.name)}
-                  </div>
-                  <div
-                    className={cn(
-                      "absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-card",
-                      user.status === "aktif" ? "bg-emerald-500" : "bg-slate-400"
-                    )}
-                  />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-foreground truncate">{user.name}</h3>
-                  <div className="flex items-center gap-1.5 mt-1 text-sm text-muted-foreground">
-                    <Mail className="w-3.5 h-3.5" />
-                    <span className="truncate">{user.email}</span>
-                  </div>
-                  {user.phone && (
-                    <div className="flex items-center gap-1.5 mt-0.5 text-sm text-muted-foreground">
-                      <Phone className="w-3.5 h-3.5" />
-                      <span>{user.phone}</span>
+              {/* Header with gradient */}
+              <div className="relative h-20 bg-gradient-to-br from-primary/80 to-primary">
+                {/* Menu Button */}
+                <div className="absolute top-3 right-3">
+                  <button
+                    onClick={() => setOpenMenuId(openMenuId === employee.id ? null : employee.id)}
+                    className="p-1.5 rounded-lg bg-white/20 hover:bg-white/30 transition-all"
+                  >
+                    <MoreHorizontal className="w-4 h-4 text-white" />
+                  </button>
+                  {openMenuId === employee.id && (
+                    <div className="absolute top-8 right-0 w-36 rounded-xl border border-border bg-popover shadow-xl z-50 p-1.5 animate-in fade-in-0 zoom-in-95">
+                      <button
+                        className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg hover:bg-muted transition-colors"
+                        onClick={() => openEditModal(employee)}
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                        Duzenle
+                      </button>
+                      <button
+                        className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg text-red-600 hover:bg-red-50 transition-colors"
+                        onClick={() => handleDeleteEmployee(employee.id)}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        Sil
+                      </button>
                     </div>
                   )}
                 </div>
-              </div>
-
-              {/* Badges */}
-              <div className="flex items-center gap-2 mt-4 pt-4 border-t border-border">
+                {/* Status Badge */}
                 <Badge
                   variant="outline"
-                  className={cn("gap-1.5 rounded-lg font-normal", roleConfig[user.role].color)}
-                >
-                  <RoleIcon className="w-3 h-3" />
-                  {roleConfig[user.role].label}
-                </Badge>
-                <Badge
-                  variant="outline"
-                  className={cn("gap-1.5 rounded-lg font-normal", statusConfig[user.status].color)}
+                  className={cn(
+                    "absolute top-3 left-3 gap-1 rounded-lg font-normal bg-white/90 border-0",
+                    employee.status === "aktif" ? "text-emerald-600" : "text-red-600"
+                  )}
                 >
                   <StatusIcon className="w-3 h-3" />
-                  {statusConfig[user.status].label}
+                  {statusConfig[employee.status].label}
                 </Badge>
-                <span className="ml-auto text-xs text-muted-foreground">
-                  {new Date(user.joinedDate).toLocaleDateString("tr-TR")}
-                </span>
+              </div>
+
+              {/* Avatar */}
+              <div className="relative -mt-10 px-5">
+                <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 border-4 border-card flex items-center justify-center text-xl font-semibold text-primary shadow-lg">
+                  {getInitials(employee.name)}
+                </div>
+              </div>
+
+              {/* Content */}
+              <div className="p-5 pt-3 space-y-4">
+                <div>
+                  <h3 className="font-semibold text-lg text-foreground">{employee.name}</h3>
+                  <div className="flex items-center gap-1.5 mt-1 text-sm text-muted-foreground">
+                    <Phone className="w-3.5 h-3.5" />
+                    <span>{employee.phone}</span>
+                  </div>
+                </div>
+
+                {/* Specialties */}
+                <div className="flex flex-wrap gap-1.5">
+                  {employee.specialty.map((spec) => (
+                    <Badge
+                      key={spec}
+                      variant="outline"
+                      className="rounded-lg bg-primary/5 text-primary border-primary/20 text-xs font-normal"
+                    >
+                      <Scissors className="w-3 h-3 mr-1" />
+                      {spec}
+                    </Badge>
+                  ))}
+                </div>
+
+                {/* Info Grid */}
+                <div className="grid grid-cols-2 gap-3 pt-3 border-t border-border">
+                  <div className="flex items-center gap-2 text-sm">
+                    <Clock className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-muted-foreground">{employee.workingHours}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <Star className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-muted-foreground">{employee.experience}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm col-span-2">
+                    <Calendar className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-muted-foreground">
+                      Baslangic: {new Date(employee.startDate).toLocaleDateString("tr-TR")}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Notes */}
+                {employee.notes && (
+                  <div className="p-3 rounded-xl bg-muted/50 text-sm text-muted-foreground">
+                    {employee.notes}
+                  </div>
+                )}
               </div>
             </div>
           )
         })}
       </div>
 
-      {filteredUsers.length === 0 && (
+      {filteredEmployees.length === 0 && (
         <div className="text-center py-12">
           <Users className="w-12 h-12 mx-auto text-muted-foreground/50" />
-          <p className="mt-4 text-muted-foreground">Kullanici bulunamadi</p>
+          <p className="mt-4 text-muted-foreground">Calisan bulunamadi</p>
         </div>
       )}
 
       {/* Add/Edit Modal */}
-      {(showAddModal || editingUser) && (
-        <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-lg rounded-3xl border border-border bg-card shadow-2xl overflow-hidden animate-in fade-in-0 zoom-in-95">
+      {(showAddModal || editingEmployee) && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl border border-border bg-card shadow-2xl animate-in fade-in-0 zoom-in-95">
             {/* Header */}
-            <div className="px-6 py-5 border-b border-border bg-gradient-to-r from-primary/5 to-transparent">
+            <div className="sticky top-0 z-10 px-6 py-5 border-b border-border bg-gradient-to-r from-primary/10 to-transparent backdrop-blur-sm">
               <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-xl font-semibold text-foreground">
-                    {editingUser ? "Kullanici Duzenle" : "Yeni Kullanici"}
-                  </h2>
-                  <p className="text-sm text-muted-foreground mt-0.5">
-                    {editingUser ? "Kullanici bilgilerini guncelleyin" : "Sisteme yeni kullanici ekleyin"}
-                  </p>
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-primary/20 flex items-center justify-center">
+                    <Briefcase className="w-6 h-6 text-primary" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-semibold text-foreground">
+                      {editingEmployee ? "Calisan Duzenle" : "Yeni Calisan"}
+                    </h2>
+                    <p className="text-sm text-muted-foreground">
+                      {editingEmployee ? "Calisan bilgilerini guncelleyin" : "Salona yeni calisan ekleyin"}
+                    </p>
+                  </div>
                 </div>
                 <button
                   onClick={() => {
                     setShowAddModal(false)
-                    setEditingUser(null)
-                    setFormData({ name: "", email: "", phone: "", role: "user", status: "aktif" })
+                    setEditingEmployee(null)
+                    resetForm()
                   }}
                   className="p-2 rounded-xl hover:bg-muted transition-colors"
                 >
@@ -425,59 +486,69 @@ export function UsersView() {
             </div>
 
             {/* Form */}
-            <div className="px-6 py-5 space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium text-foreground">Ad Soyad *</label>
-                <Input
-                  placeholder="Ornek: Ahmet Yilmaz"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="rounded-xl"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-foreground">E-posta *</label>
-                  <Input
-                    type="email"
-                    placeholder="ornek@email.com"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="rounded-xl"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-foreground">Telefon</label>
-                  <Input
-                    placeholder="+90 555 000 0000"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    className="rounded-xl"
-                  />
+            <div className="p-6 space-y-6">
+              {/* Basic Info */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+                  Temel Bilgiler
+                </h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">Ad Soyad *</label>
+                    <Input
+                      placeholder="Ornek: Ahmet Yilmaz"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      className="rounded-xl h-11"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">Telefon *</label>
+                    <Input
+                      placeholder="+90 555 000 0000"
+                      value={formData.phone}
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                      className="rounded-xl h-11"
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-foreground">Rol</label>
-                  <Select
-                    value={formData.role}
-                    onValueChange={(value: "admin" | "supervisor" | "user") =>
-                      setFormData({ ...formData, role: value })
-                    }
-                  >
-                    <SelectTrigger className="rounded-xl">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="admin">Admin</SelectItem>
-                      <SelectItem value="supervisor">Supervisor</SelectItem>
-                      <SelectItem value="user">Kullanici</SelectItem>
-                    </SelectContent>
-                  </Select>
+              {/* Work Info */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+                  Calisma Bilgileri
+                </h3>
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">Calisma Saatleri</label>
+                    <Input
+                      placeholder="09:00 - 18:00"
+                      value={formData.workingHours}
+                      onChange={(e) => setFormData({ ...formData, workingHours: e.target.value })}
+                      className="rounded-xl h-11"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">Deneyim</label>
+                    <Input
+                      placeholder="3 yil"
+                      value={formData.experience}
+                      onChange={(e) => setFormData({ ...formData, experience: e.target.value })}
+                      className="rounded-xl h-11"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">Baslangic Tarihi</label>
+                    <Input
+                      type="date"
+                      value={formData.startDate}
+                      onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                      className="rounded-xl h-11"
+                    />
+                  </div>
                 </div>
-                <div className="space-y-1.5">
+                <div className="space-y-2">
                   <label className="text-sm font-medium text-foreground">Durum</label>
                   <Select
                     value={formData.status}
@@ -485,7 +556,7 @@ export function UsersView() {
                       setFormData({ ...formData, status: value })
                     }
                   >
-                    <SelectTrigger className="rounded-xl">
+                    <SelectTrigger className="rounded-xl h-11 w-40">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -495,26 +566,62 @@ export function UsersView() {
                   </Select>
                 </div>
               </div>
+
+              {/* Specialties */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+                  Uzmanlik Alanlari
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {specialtyOptions.map((spec) => (
+                    <button
+                      key={spec}
+                      type="button"
+                      onClick={() => toggleSpecialty(spec)}
+                      className={cn(
+                        "px-4 py-2 rounded-xl text-sm font-medium transition-all",
+                        formData.specialty.includes(spec)
+                          ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25"
+                          : "bg-muted hover:bg-muted/80 text-muted-foreground"
+                      )}
+                    >
+                      {spec}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Notes */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground">Notlar</label>
+                <Textarea
+                  placeholder="Calisan hakkinda ek bilgiler..."
+                  value={formData.notes}
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  className="rounded-xl min-h-24 resize-none"
+                />
+              </div>
             </div>
 
             {/* Footer */}
-            <div className="px-6 py-4 border-t border-border bg-muted/30 flex items-center justify-end gap-3">
+            <div className="sticky bottom-0 px-6 py-4 border-t border-border bg-card/80 backdrop-blur-sm flex items-center justify-end gap-3">
               <Button
                 variant="outline"
-                className="rounded-xl"
+                className="rounded-xl h-11 px-6"
                 onClick={() => {
                   setShowAddModal(false)
-                  setEditingUser(null)
-                  setFormData({ name: "", email: "", phone: "", role: "user", status: "aktif" })
+                  setEditingEmployee(null)
+                  resetForm()
                 }}
               >
                 Vazgec
               </Button>
               <Button
-                className="rounded-xl"
-                onClick={editingUser ? handleEditUser : handleAddUser}
+                className="rounded-xl h-11 px-6 gap-2 shadow-lg shadow-primary/25"
+                onClick={editingEmployee ? handleEditEmployee : handleAddEmployee}
               >
-                {editingUser ? "Guncelle" : "Kullanici Ekle"}
+                <Save className="w-4 h-4" />
+                {editingEmployee ? "Guncelle" : "Calisan Ekle"}
               </Button>
             </div>
           </div>
