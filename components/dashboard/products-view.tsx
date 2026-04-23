@@ -6,6 +6,14 @@ import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
+import {
   Table,
   TableBody,
   TableCell,
@@ -24,13 +32,20 @@ import {
   Search,
   SlidersHorizontal,
   X,
+  Package,
+  Edit3,
+  Trash2,
+  DollarSign,
+  Tag,
+  Boxes,
+  ImageIcon,
 } from "lucide-react"
 
 const categoryCards = [
-  { label: "Ana Yemekler", count: 24, color: "bg-blue-500" },
-  { label: "Baslangiclar", count: 18, color: "bg-amber-500" },
-  { label: "Tatlilar", count: 12, color: "bg-pink-500" },
-  { label: "Icecekler", count: 32, color: "bg-green-500" },
+  { label: "Ana Yemekler", count: 24, color: "bg-blue-500", bgColor: "bg-blue-500/10", textColor: "text-blue-600" },
+  { label: "Baslangiclar", count: 18, color: "bg-amber-500", bgColor: "bg-amber-500/10", textColor: "text-amber-600" },
+  { label: "Tatlilar", count: 12, color: "bg-pink-500", bgColor: "bg-pink-500/10", textColor: "text-pink-600" },
+  { label: "Icecekler", count: 32, color: "bg-emerald-500", bgColor: "bg-emerald-500/10", textColor: "text-emerald-600" },
 ]
 
 const initialProducts = [
@@ -107,9 +122,9 @@ const initialProducts = [
 ]
 
 const statusColors: Record<string, string> = {
-  "mevcut": "bg-green-100 text-green-700 border-green-200",
-  "stokta yok": "bg-red-100 text-red-700 border-red-200",
-  "dusuk stok": "bg-amber-100 text-amber-700 border-amber-200",
+  "mevcut": "bg-emerald-500/10 text-emerald-600 border-emerald-200",
+  "stokta yok": "bg-red-500/10 text-red-600 border-red-200",
+  "dusuk stok": "bg-amber-500/10 text-amber-600 border-amber-200",
 }
 
 export function ProductsView() {
@@ -302,189 +317,376 @@ export function ProductsView() {
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-foreground">Menu Urunleri</h1>
-        <Button className="rounded-xl" onClick={() => setShowAddCard(true)}>
-          <Plus className="w-4 h-4 mr-1" />
-          Urun ekle
+        <div>
+          <h1 className="text-2xl font-semibold text-foreground">Menu Urunleri</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Tum menu urunlerini yonetin ve duzenleyin
+          </p>
+        </div>
+        <Button className="rounded-xl gap-2" onClick={() => setShowAddCard(true)}>
+          <Plus className="w-4 h-4" />
+          Urun Ekle
         </Button>
       </div>
 
+      {/* Add Product Modal */}
       {showAddCard && (
-        <div className="fixed inset-0 z-50 bg-background/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-2xl rounded-3xl border border-border/70 bg-card/95 shadow-2xl overflow-hidden">
-            <div className="px-6 py-5 border-b border-border/70">
-              <h2 className="text-xl font-semibold text-foreground">Yeni Urun Ekle</h2>
-              <p className="text-sm text-muted-foreground mt-1">
-                Urun bilgilerini girerek listeye yeni urun ekleyin.
-              </p>
+        <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-2xl rounded-3xl border border-border bg-card shadow-2xl overflow-hidden animate-in fade-in-0 zoom-in-95">
+            {/* Header */}
+            <div className="px-6 py-5 border-b border-border bg-gradient-to-r from-primary/5 to-transparent">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                    <Package className="w-5 h-5 text-primary" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-semibold text-foreground">Yeni Urun Ekle</h2>
+                    <p className="text-sm text-muted-foreground">Menuye yeni urun ekleyin</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowAddCard(false)}
+                  className="p-2 rounded-xl hover:bg-muted transition-colors"
+                >
+                  <X className="w-5 h-5 text-muted-foreground" />
+                </button>
+              </div>
             </div>
-            <div className="px-6 py-5 space-y-4">
+
+            {/* Form */}
+            <div className="px-6 py-6 space-y-5">
+              {/* Image Upload Placeholder */}
+              <div className="flex items-center gap-4 p-4 rounded-2xl border-2 border-dashed border-border bg-muted/30">
+                <div className="w-20 h-20 rounded-xl bg-muted flex items-center justify-center">
+                  <ImageIcon className="w-8 h-8 text-muted-foreground" />
+                </div>
+                <div>
+                  <p className="font-medium text-foreground">Urun Gorseli</p>
+                  <p className="text-sm text-muted-foreground">PNG, JPG - max 2MB</p>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <p className="text-xs font-medium text-muted-foreground">Urun adi</p>
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 text-sm font-medium text-foreground">
+                    <Tag className="w-4 h-4 text-muted-foreground" />
+                    Urun Adi *
+                  </label>
                   <Input
-                    placeholder="Orn: Sac Bakim Seti"
+                    placeholder="Ornek: Grilled Salmon"
                     value={newProduct.name}
                     onChange={(e) => setNewProduct((p) => ({ ...p, name: e.target.value }))}
-                    className="rounded-xl"
+                    className="rounded-xl h-11"
                   />
                 </div>
-                <div className="space-y-1.5">
-                  <p className="text-xs font-medium text-muted-foreground">Kategori</p>
-                  <Input
-                    placeholder="Orn: Bakim"
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 text-sm font-medium text-foreground">
+                    <Boxes className="w-4 h-4 text-muted-foreground" />
+                    Kategori *
+                  </label>
+                  <Select
                     value={newProduct.category}
-                    onChange={(e) => setNewProduct((p) => ({ ...p, category: e.target.value }))}
-                    className="rounded-xl"
-                  />
+                    onValueChange={(value) => setNewProduct((p) => ({ ...p, category: value }))}
+                  >
+                    <SelectTrigger className="rounded-xl h-11">
+                      <SelectValue placeholder="Kategori secin" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">Ana Yemekler</SelectItem>
+                      <SelectItem value="2">Baslangiclar</SelectItem>
+                      <SelectItem value="3">Tatlilar</SelectItem>
+                      <SelectItem value="4">Icecekler</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-                <div className="space-y-1.5">
-                  <p className="text-xs font-medium text-muted-foreground">Fiyat</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 text-sm font-medium text-foreground">
+                    <DollarSign className="w-4 h-4 text-muted-foreground" />
+                    Fiyat *
+                  </label>
                   <Input
-                    placeholder="Orn: 24.99"
+                    placeholder="0.00"
+                    type="number"
                     value={newProduct.price}
                     onChange={(e) => setNewProduct((p) => ({ ...p, price: e.target.value }))}
-                    className="rounded-xl"
+                    className="rounded-xl h-11"
                   />
                 </div>
-                <div className="space-y-1.5">
-                  <p className="text-xs font-medium text-muted-foreground">Maliyet</p>
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 text-sm font-medium text-foreground">
+                    <DollarSign className="w-4 h-4 text-muted-foreground" />
+                    Maliyet *
+                  </label>
                   <Input
-                    placeholder="Orn: 8.50"
+                    placeholder="0.00"
+                    type="number"
                     value={newProduct.cost}
                     onChange={(e) => setNewProduct((p) => ({ ...p, cost: e.target.value }))}
-                    className="rounded-xl"
+                    className="rounded-xl h-11"
                   />
                 </div>
-                <div className="space-y-1.5">
-                  <p className="text-xs font-medium text-muted-foreground">Stok</p>
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 text-sm font-medium text-foreground">
+                    <Package className="w-4 h-4 text-muted-foreground" />
+                    Stok *
+                  </label>
                   <Input
-                    placeholder="Orn: 10"
+                    placeholder="0"
                     type="number"
                     value={newProduct.stock}
                     onChange={(e) => setNewProduct((p) => ({ ...p, stock: e.target.value }))}
-                    className="rounded-xl"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <p className="text-xs font-medium text-muted-foreground">Aciklama</p>
-                  <Input
-                    placeholder="Kisa urun aciklamasi"
-                    value={newProduct.description}
-                    onChange={(e) => setNewProduct((p) => ({ ...p, description: e.target.value }))}
-                    className="rounded-xl"
+                    className="rounded-xl h-11"
                   />
                 </div>
               </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground">Aciklama</label>
+                <Textarea
+                  placeholder="Urun hakkinda kisa aciklama yazin..."
+                  value={newProduct.description}
+                  onChange={(e) => setNewProduct((p) => ({ ...p, description: e.target.value }))}
+                  className="rounded-xl resize-none"
+                  rows={3}
+                />
+              </div>
             </div>
-            <div className="px-6 py-4 border-t border-border/70 bg-muted/20">
-              <div className="grid grid-cols-2 gap-3">
-                <Button
-                  variant="outline"
-                  className="rounded-xl bg-green-600 text-white border-green-600 hover:bg-green-700 hover:text-white"
-                  onClick={handleCreateProduct}
+
+            {/* Footer */}
+            <div className="px-6 py-4 border-t border-border bg-muted/30 flex items-center justify-end gap-3">
+              <Button
+                variant="outline"
+                className="rounded-xl px-6"
+                onClick={() => setShowAddCard(false)}
+              >
+                Vazgec
+              </Button>
+              <Button
+                className="rounded-xl px-6"
+                onClick={handleCreateProduct}
+              >
+                Urun Ekle
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Product Modal */}
+      {editingProductId && (
+        <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-2xl rounded-3xl border border-border bg-card shadow-2xl overflow-hidden animate-in fade-in-0 zoom-in-95">
+            {/* Header */}
+            <div className="px-6 py-5 border-b border-border bg-gradient-to-r from-amber-500/5 to-transparent">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center">
+                    <Edit3 className="w-5 h-5 text-amber-600" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-semibold text-foreground">Urun Duzenle</h2>
+                    <p className="text-sm text-muted-foreground">{editingProductName}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setEditingProductId(null)}
+                  className="p-2 rounded-xl hover:bg-muted transition-colors"
                 >
-                  Kaydet
-                </Button>
+                  <X className="w-5 h-5 text-muted-foreground" />
+                </button>
+              </div>
+            </div>
+
+            {/* Form */}
+            <div className="px-6 py-6 space-y-5">
+              {/* Image Upload Placeholder */}
+              <div className="flex items-center gap-4 p-4 rounded-2xl border-2 border-dashed border-border bg-muted/30">
+                <div className="w-20 h-20 rounded-xl bg-muted flex items-center justify-center">
+                  <ImageIcon className="w-8 h-8 text-muted-foreground" />
+                </div>
+                <div>
+                  <p className="font-medium text-foreground">Urun Gorseli</p>
+                  <p className="text-sm text-muted-foreground">Gorseli degistirmek icin tiklayin</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 text-sm font-medium text-foreground">
+                    <Tag className="w-4 h-4 text-muted-foreground" />
+                    Urun Adi *
+                  </label>
+                  <Input
+                    placeholder="Urun adi"
+                    value={editProduct.name}
+                    onChange={(e) => setEditProduct((p) => ({ ...p, name: e.target.value }))}
+                    className="rounded-xl h-11"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 text-sm font-medium text-foreground">
+                    <Boxes className="w-4 h-4 text-muted-foreground" />
+                    Kategori *
+                  </label>
+                  <Select
+                    value={editProduct.category}
+                    onValueChange={(value) => setEditProduct((p) => ({ ...p, category: value }))}
+                  >
+                    <SelectTrigger className="rounded-xl h-11">
+                      <SelectValue placeholder="Kategori secin" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">Ana Yemekler</SelectItem>
+                      <SelectItem value="2">Baslangiclar</SelectItem>
+                      <SelectItem value="3">Tatlilar</SelectItem>
+                      <SelectItem value="4">Icecekler</SelectItem>
+                      <SelectItem value="Main Courses">Main Courses</SelectItem>
+                      <SelectItem value="Appetizers">Appetizers</SelectItem>
+                      <SelectItem value="Desserts">Desserts</SelectItem>
+                      <SelectItem value="Beverages">Beverages</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 text-sm font-medium text-foreground">
+                    <DollarSign className="w-4 h-4 text-muted-foreground" />
+                    Fiyat *
+                  </label>
+                  <Input
+                    placeholder="0.00"
+                    type="number"
+                    value={editProduct.price}
+                    onChange={(e) => setEditProduct((p) => ({ ...p, price: e.target.value }))}
+                    className="rounded-xl h-11"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 text-sm font-medium text-foreground">
+                    <DollarSign className="w-4 h-4 text-muted-foreground" />
+                    Maliyet *
+                  </label>
+                  <Input
+                    placeholder="0.00"
+                    type="number"
+                    value={editProduct.cost}
+                    onChange={(e) => setEditProduct((p) => ({ ...p, cost: e.target.value }))}
+                    className="rounded-xl h-11"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 text-sm font-medium text-foreground">
+                    <Package className="w-4 h-4 text-muted-foreground" />
+                    Stok *
+                  </label>
+                  <Input
+                    placeholder="0"
+                    type="number"
+                    value={editProduct.stock}
+                    onChange={(e) => setEditProduct((p) => ({ ...p, stock: e.target.value }))}
+                    className="rounded-xl h-11"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground">Aciklama</label>
+                <Textarea
+                  placeholder="Urun hakkinda kisa aciklama yazin..."
+                  value={editProduct.description}
+                  onChange={(e) => setEditProduct((p) => ({ ...p, description: e.target.value }))}
+                  className="rounded-xl resize-none"
+                  rows={3}
+                />
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 border-t border-border bg-muted/30 flex items-center justify-between">
+              <Button
+                variant="ghost"
+                className="rounded-xl text-red-600 hover:text-red-700 hover:bg-red-50"
+                onClick={() => {
+                  if (editingProductId) handleRemoveProduct(editingProductId)
+                  setEditingProductId(null)
+                }}
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Urunu Sil
+              </Button>
+              <div className="flex items-center gap-3">
                 <Button
                   variant="outline"
-                  className="rounded-xl bg-blue-600 text-white border-blue-600 hover:bg-blue-700 hover:text-white"
-                  onClick={() => setShowAddCard(false)}
+                  className="rounded-xl px-6"
+                  onClick={() => setEditingProductId(null)}
                 >
                   Vazgec
                 </Button>
+                <Button
+                  className="rounded-xl px-6"
+                  onClick={handleUpdateProduct}
+                >
+                  Degisiklikleri Kaydet
+                </Button>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {editingProductId && (
-        <div className="fixed inset-0 z-50 bg-background/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-2xl rounded-3xl border border-border/70 bg-card/95 shadow-2xl overflow-hidden">
-            <div className="px-6 py-5 border-b border-border/70">
-              <h2 className="text-xl font-semibold text-foreground">
-                Urun Duzenle{editingProductName ? `: ${editingProductName}` : ""}
-              </h2>
-            </div>
-            <div className="px-6 py-5 space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <p className="text-xs font-medium text-muted-foreground">Urun adi</p>
-                  <Input placeholder="Urun adi" value={editProduct.name} onChange={(e) => setEditProduct((p) => ({ ...p, name: e.target.value }))} className="rounded-xl" />
-                </div>
-                <div className="space-y-1.5">
-                  <p className="text-xs font-medium text-muted-foreground">Kategori (id)</p>
-                  <Input placeholder="Kategori (id)" value={editProduct.category} onChange={(e) => setEditProduct((p) => ({ ...p, category: e.target.value }))} className="rounded-xl" />
-                </div>
-                <div className="space-y-1.5">
-                  <p className="text-xs font-medium text-muted-foreground">Fiyat</p>
-                  <Input placeholder="Fiyat" value={editProduct.price} onChange={(e) => setEditProduct((p) => ({ ...p, price: e.target.value }))} className="rounded-xl" />
-                </div>
-                <div className="space-y-1.5">
-                  <p className="text-xs font-medium text-muted-foreground">Maliyet</p>
-                  <Input placeholder="Maliyet" value={editProduct.cost} onChange={(e) => setEditProduct((p) => ({ ...p, cost: e.target.value }))} className="rounded-xl" />
-                </div>
-                <div className="space-y-1.5">
-                  <p className="text-xs font-medium text-muted-foreground">Stok</p>
-                  <Input placeholder="Stok" type="number" value={editProduct.stock} onChange={(e) => setEditProduct((p) => ({ ...p, stock: e.target.value }))} className="rounded-xl" />
-                </div>
-                <div className="space-y-1.5">
-                  <p className="text-xs font-medium text-muted-foreground">Aciklama</p>
-                  <Input placeholder="Aciklama" value={editProduct.description} onChange={(e) => setEditProduct((p) => ({ ...p, description: e.target.value }))} className="rounded-xl" />
-                </div>
-              </div>
-            </div>
-            <div className="px-6 py-4 border-t border-border/70 bg-muted/20 grid grid-cols-2 gap-3">
-              <Button className="rounded-xl bg-green-600 text-white border-green-600 hover:bg-green-700 hover:text-white" variant="outline" onClick={handleUpdateProduct}>Kaydet</Button>
-              <Button className="rounded-xl bg-blue-600 text-white border-blue-600 hover:bg-blue-700 hover:text-white" variant="outline" onClick={() => setEditingProductId(null)}>Vazgec</Button>
-            </div>
-          </div>
-        </div>
-      )}
-
+      {/* Category Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {categoryCards.map((card) => (
           <div
             key={card.label}
-            className="p-4 bg-card rounded-2xl border border-border"
+            className="group p-5 bg-card rounded-2xl border border-border hover:border-primary/30 hover:shadow-lg transition-all duration-300 cursor-pointer"
           >
-            <div className="flex items-center gap-2 mb-2">
-              <span className={cn("w-1 h-8 rounded-full", card.color)} />
-              <span className="text-sm text-muted-foreground">{card.label}</span>
+            <div className="flex items-center gap-3">
+              <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center", card.bgColor)}>
+                <Package className={cn("w-5 h-5", card.textColor)} />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-foreground">{card.count}</p>
+                <p className="text-sm text-muted-foreground">{card.label}</p>
+              </div>
             </div>
-            <span className="text-2xl font-bold text-foreground">{card.count}</span>
-            <span className="text-sm text-muted-foreground ml-1">urun</span>
           </div>
         ))}
       </div>
 
-      <div className="bg-card rounded-2xl border border-border">
+      {/* Product List */}
+      <div className="bg-card rounded-2xl border border-border overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-4 p-4 border-b border-border">
           <div className="flex items-center gap-3">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
-                placeholder="Urun ara"
-                className="pl-9 w-48 bg-muted/50 border-0 rounded-xl"
+                placeholder="Urun ara..."
+                className="pl-10 w-56 bg-muted/50 border-0 rounded-xl"
               />
             </div>
             <span className="text-sm text-muted-foreground">{products.length} urun</span>
           </div>
 
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" className="text-primary">
-              <Download className="w-4 h-4 mr-1" />
-              Disa aktar
+            <Button variant="outline" size="sm" className="rounded-xl gap-2">
+              <Download className="w-4 h-4" />
+              Disa Aktar
             </Button>
-            <Button variant="ghost" size="sm">
-              <SlidersHorizontal className="w-4 h-4 mr-1" />
+            <Button variant="outline" size="sm" className="rounded-xl gap-2">
+              <SlidersHorizontal className="w-4 h-4" />
               Sirala
             </Button>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
+        <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-muted/30">
           <Filter className="w-4 h-4 text-muted-foreground" />
           <Badge variant="secondary" className="gap-1 rounded-lg">
             Ana Yemekler
@@ -495,10 +697,10 @@ export function ProductsView() {
           </button>
           <div className="ml-auto flex items-center gap-1 text-sm text-muted-foreground">
             <span>1 / 1</span>
-            <button className="p-1 hover:bg-muted rounded">
+            <button className="p-1 hover:bg-muted rounded-lg">
               <ChevronLeft className="w-4 h-4" />
             </button>
-            <button className="p-1 hover:bg-muted rounded">
+            <button className="p-1 hover:bg-muted rounded-lg">
               <ChevronRight className="w-4 h-4" />
             </button>
           </div>
@@ -533,27 +735,40 @@ export function ProductsView() {
           </TableHeader>
           <TableBody>
             {products.map((product) => (
-              <TableRow key={product.id}>
+              <TableRow key={product.id} className="group">
                 <TableCell>
                   <Checkbox />
                 </TableCell>
                 <TableCell>
-                  <div>
-                    <p className="font-medium">{product.name}</p>
-                    <p className="text-xs text-muted-foreground">{product.description}</p>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center">
+                      <Package className="w-5 h-5 text-muted-foreground" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-foreground">{product.name}</p>
+                      <p className="text-xs text-muted-foreground">{product.description}</p>
+                    </div>
                   </div>
                 </TableCell>
-                <TableCell>{product.category}</TableCell>
-                <TableCell className="font-medium">${product.price}</TableCell>
+                <TableCell>
+                  <Badge variant="secondary" className="rounded-lg font-normal">
+                    {product.category}
+                  </Badge>
+                </TableCell>
+                <TableCell className="font-semibold text-foreground">${product.price}</TableCell>
                 <TableCell className="text-muted-foreground">${product.cost}</TableCell>
-                <TableCell>{product.stock}</TableCell>
+                <TableCell>
+                  <span className={cn(
+                    "font-medium",
+                    product.stock <= 0 ? "text-red-600" : product.stock <= 10 ? "text-amber-600" : "text-foreground"
+                  )}>
+                    {product.stock}
+                  </span>
+                </TableCell>
                 <TableCell>
                   <Badge
                     variant="outline"
-                    className={cn(
-                      "rounded-lg font-normal",
-                      statusColors[product.status]
-                    )}
+                    className={cn("rounded-lg font-normal", statusColors[product.status])}
                   >
                     {product.status}
                   </Badge>
@@ -561,15 +776,15 @@ export function ProductsView() {
                 <TableCell className="relative overflow-visible">
                   <div className="relative flex justify-end" ref={openMenuId === String(product.id) ? menuRef : null}>
                     <button
-                      className="p-1.5 hover:bg-muted rounded-md"
+                      className="p-1.5 hover:bg-muted rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
                       onClick={(e) => {
                         const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect()
                         const nextId = String(product.id)
                         setOpenMenuId((prev) => (prev === nextId ? null : nextId))
-                        setMenuPosition({ top: rect.bottom + 6, left: rect.right - 128 })
+                        setMenuPosition({ top: rect.bottom + 6, left: rect.right - 144 })
                       }}
                     >
-                    <MoreHorizontal className="w-4 h-4 text-muted-foreground" />
+                      <MoreHorizontal className="w-4 h-4 text-muted-foreground" />
                     </button>
                   </div>
                 </TableCell>
@@ -579,22 +794,25 @@ export function ProductsView() {
         </Table>
       </div>
 
+      {/* Dropdown Menu */}
       {openMenuId && menuPosition && (
         <div
           ref={menuRef}
-          className="fixed w-32 rounded-xl border border-border bg-popover shadow-lg z-[100] p-1"
+          className="fixed w-36 rounded-xl border border-border bg-popover shadow-xl z-[100] p-1.5 animate-in fade-in-0 zoom-in-95"
           style={{ top: menuPosition.top, left: menuPosition.left }}
         >
           <button
-            className="w-full text-left px-3 py-2 text-sm rounded-md hover:bg-muted"
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg hover:bg-muted transition-colors"
             onClick={() => openEditProductCard(openMenuId)}
           >
+            <Edit3 className="w-3.5 h-3.5" />
             Duzenle
           </button>
           <button
-            className="w-full text-left px-3 py-2 text-sm rounded-md text-red-600 hover:bg-red-50"
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg text-red-600 hover:bg-red-50 transition-colors"
             onClick={() => handleRemoveProduct(openMenuId)}
           >
+            <Trash2 className="w-3.5 h-3.5" />
             Kaldir
           </button>
         </div>
