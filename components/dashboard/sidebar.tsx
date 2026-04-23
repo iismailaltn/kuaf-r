@@ -11,29 +11,62 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
+  Users,
+  CalendarCheck2,
 } from "lucide-react"
 import { useState } from "react"
 
-export type ViewType = "dashboard" | "orders" | "tables" | "products" | "inventory" | "settings"
+export type UserRole = "admin" | "supervisor" | "user"
+export type ViewType =
+  | "dashboard"
+  | "orders"
+  | "tables"
+  | "products"
+  | "inventory"
+  | "users"
+  | "reservations"
+  | "customers"
+  | "settings"
 
 interface SidebarProps {
   activeView: ViewType
   onViewChange: (view: ViewType) => void
   onLogout: () => void
   restaurantName?: string
+  role?: UserRole
 }
 
-const navItems = [
-  { id: "dashboard" as const, icon: LayoutDashboard, label: "Panel" },
-  { id: "orders" as const, icon: ShoppingCart, label: "Siparisler" },
-  { id: "tables" as const, icon: UtensilsCrossed, label: "Masalar" },
-  { id: "products" as const, icon: Package, label: "Urunler" },
-  { id: "inventory" as const, icon: Box, label: "Stok" },
-  { id: "settings" as const, icon: Settings, label: "Ayarlar" },
-]
+const navItemsByRole: Record<UserRole, Array<{ id: ViewType; icon: any; label: string }>> = {
+  admin: [
+    { id: "dashboard", icon: LayoutDashboard, label: "Panel" },
+    { id: "orders", icon: ShoppingCart, label: "Siparisler" },
+    { id: "tables", icon: UtensilsCrossed, label: "Çalısma Alanları" },
+    { id: "products", icon: Package, label: "Urunler" },
+    { id: "users", icon: Users, label: "Kullanicilar" },
+    { id: "reservations", icon: CalendarCheck2, label: "Rezervasyonlar" },
+    { id: "inventory", icon: Box, label: "Stok" },
+    { id: "settings", icon: Settings, label: "Ayarlar" },
+  ],
+  supervisor: [
+    { id: "dashboard", icon: LayoutDashboard, label: "Panel" },
+    { id: "customers", icon: Users, label: "Tum Musteriler" },
+    { id: "settings", icon: Settings, label: "Ayarlar" },
+  ],
+  user: [
+    { id: "dashboard", icon: LayoutDashboard, label: "Panel" },
+    { id: "orders", icon: ShoppingCart, label: "Siparisler" },
+    { id: "tables", icon: UtensilsCrossed, label: "Calisma Alanlari" },
+    { id: "products", icon: Package, label: "Urunler" },
+    { id: "settings", icon: Settings, label: "Ayarlar" },
+  ],
+}
 
-export function Sidebar({ activeView, onViewChange, onLogout, restaurantName = "Restoran" }: SidebarProps) {
+export function Sidebar({ activeView, onViewChange, onLogout, restaurantName = "Restoran", role = "user" }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false)
+  const navItems = navItemsByRole[role] ?? navItemsByRole.user
+  const adminSectionIds: ViewType[] = ["users", "reservations", "inventory"]
+  const mainNavItems = role === "admin" ? navItems.filter((item) => !adminSectionIds.includes(item.id)) : navItems
+  const adminNavItems = role === "admin" ? navItems.filter((item) => adminSectionIds.includes(item.id)) : []
 
   return (
     <aside
@@ -75,7 +108,34 @@ export function Sidebar({ activeView, onViewChange, onLogout, restaurantName = "
       )}
 
       <nav className="flex-1 p-3 space-y-1">
-        {navItems.map((item) => {
+        {mainNavItems.map((item) => {
+          const isActive = item.id === activeView
+          const Icon = item.icon
+
+          return (
+            <button
+              key={item.id}
+              onClick={() => onViewChange(item.id)}
+              className={cn(
+                "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all",
+                isActive
+                  ? "bg-primary text-primary-foreground shadow-md"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              )}
+            >
+              <Icon className="w-5 h-5 shrink-0" />
+              {!collapsed && (
+                <span className="text-sm font-medium">{item.label}</span>
+              )}
+            </button>
+          )
+        })}
+        {role === "admin" && !collapsed && (
+          <div className="px-3 pt-3 pb-1 text-xs font-semibold tracking-wide text-muted-foreground/80">
+            Admin
+          </div>
+        )}
+        {adminNavItems.map((item) => {
           const isActive = item.id === activeView
           const Icon = item.icon
 

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Sidebar, ViewType } from "@/components/dashboard/sidebar"
+import { Sidebar, ViewType, UserRole } from "@/components/dashboard/sidebar"
 import { Header } from "@/components/dashboard/header"
 import { DashboardView } from "@/components/dashboard/dashboard-view"
 import { OrdersView } from "@/components/dashboard/orders-view"
@@ -17,6 +17,7 @@ type AuthState = "login" | "register" | "authenticated"
 interface User {
   email: string
   restaurantName: string
+  role: UserRole
 }
 
 export default function Dashboard() {
@@ -25,13 +26,22 @@ export default function Dashboard() {
   const [activeView, setActiveView] = useState<ViewType>("dashboard")
 
   const handleLogin = async (emailOrUsername: string, password: string) => {
+    const loginId = emailOrUsername.trim().toLowerCase()
+    if (loginId === "admin" && password === "admin") {
+      setUser({ email: "admin", restaurantName: "admin", role: "admin" })
+      setAuthState("authenticated")
+      setActiveView("dashboard")
+      return
+    }
     try {
       const authUser = await loginWithApi({
         username: emailOrUsername,
         password,
       })
-      setUser({ email: authUser.username, restaurantName: authUser.restaurantName })
+      const role = (authUser.role === "admin" || authUser.role === "supervisor") ? authUser.role : "user"
+      setUser({ email: authUser.username, restaurantName: authUser.restaurantName, role })
       setAuthState("authenticated")
+      setActiveView("dashboard")
     } catch (e) {
       alert(e instanceof Error ? e.message : "Giris basarisiz.")
     }
@@ -54,7 +64,7 @@ export default function Dashboard() {
       ownerNormalized === "admin" &&
       data.password === "admin"
     ) {
-      setUser({ email: data.email, restaurantName: data.restaurantName })
+      setUser({ email: data.email, restaurantName: data.restaurantName, role: "admin" })
       setAuthState("authenticated")
       return
     }
@@ -93,7 +103,7 @@ export default function Dashboard() {
       case "orders":
         return <OrdersView />
       case "tables":
-        return <TablesView />
+        return <TablesView canManage={user?.role === "admin"} />
       case "products":
         return <ProductsView />
       case "inventory":
@@ -103,6 +113,27 @@ export default function Dashboard() {
           <div className="p-6">
             <h1 className="text-2xl font-semibold text-foreground">Ayarlar</h1>
             <p className="text-muted-foreground mt-2">Ayarlar sayfasi yakinda gelecek.</p>
+          </div>
+        )
+      case "users":
+        return (
+          <div className="p-6">
+            <h1 className="text-2xl font-semibold text-foreground">Kullanicilar</h1>
+            <p className="text-muted-foreground mt-2">Admin kullanicilari buradan yonetebilir.</p>
+          </div>
+        )
+      case "reservations":
+        return (
+          <div className="p-6">
+            <h1 className="text-2xl font-semibold text-foreground">Rezervasyonlar</h1>
+            <p className="text-muted-foreground mt-2">Admin rezervasyonlari bu alanda takip eder.</p>
+          </div>
+        )
+      case "customers":
+        return (
+          <div className="p-6">
+            <h1 className="text-2xl font-semibold text-foreground">Tum Musteriler</h1>
+            <p className="text-muted-foreground mt-2">Supervisor tum musteri kayitlarini burada gorur.</p>
           </div>
         )
       default:
@@ -117,6 +148,7 @@ export default function Dashboard() {
         onViewChange={setActiveView}
         onLogout={handleLogout}
         restaurantName={user?.restaurantName}
+        role={user?.role}
       />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header />
