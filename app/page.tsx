@@ -10,6 +10,7 @@ import { ProductsView } from "@/components/dashboard/products-view"
 import { InventoryView } from "@/components/dashboard/inventory-view"
 import { LoginForm } from "@/components/auth/login-form"
 import { RegisterForm } from "@/components/auth/register-form"
+import { UsersView } from "@/components/dashboard/users-view"
 import { loginWithApi } from "@/lib/services/auth-service"
 
 type AuthState = "login" | "register" | "authenticated"
@@ -116,12 +117,7 @@ export default function Dashboard() {
           </div>
         )
       case "users":
-        return (
-          <div className="p-6">
-            <h1 className="text-2xl font-semibold text-foreground">Kullanicilar</h1>
-            <p className="text-muted-foreground mt-2">Admin kullanicilari buradan yonetebilir.</p>
-          </div>
-        )
+        return <UsersView />
       case "reservations":
         return (
           <div className="p-6">
