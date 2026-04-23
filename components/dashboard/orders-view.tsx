@@ -1,8 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useRef, useEffect } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import {
   Select,
@@ -11,23 +12,38 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
 import { cn } from "@/lib/utils"
 import {
   ChefHat,
+  ChevronLeft,
+  ChevronRight,
   Clock,
   Download,
-  Eye,
   Filter,
   MoreHorizontal,
   Plus,
   Search,
+  SlidersHorizontal,
   TrendingDown,
   TrendingUp,
   UtensilsCrossed,
   CheckCircle2,
-  Timer,
   AlertCircle,
   X,
+  Eye,
+  Edit3,
+  Trash2,
+  Receipt,
+  MapPin,
+  User,
 } from "lucide-react"
 
 interface OrderItem {
@@ -196,6 +212,9 @@ export function OrdersView() {
   const [searchQuery, setSearchQuery] = useState("")
   const [filterStatus, setFilterStatus] = useState<string>("all")
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null)
+  const menuRef = useRef<HTMLDivElement | null>(null)
 
   const filteredOrders = orders.filter((order) => {
     const matchesSearch =
@@ -206,8 +225,14 @@ export function OrdersView() {
     return matchesSearch && matchesStatus
   })
 
-  const activeOrders = filteredOrders.filter((o) => o.status !== "tamamlandi")
-  const completedOrders = filteredOrders.filter((o) => o.status === "tamamlandi")
+  useEffect(() => {
+    const onDocClick = (event: MouseEvent) => {
+      if (!menuRef.current) return
+      if (!menuRef.current.contains(event.target as Node)) setOpenMenuId(null)
+    }
+    document.addEventListener("mousedown", onDocClick)
+    return () => document.removeEventListener("mousedown", onDocClick)
+  }, [])
 
   return (
     <div className="p-6 space-y-6">
@@ -231,192 +256,282 @@ export function OrdersView() {
           return (
             <div
               key={card.label}
-              className="group p-5 bg-card rounded-2xl border border-border hover:border-primary/30 hover:shadow-lg transition-all duration-300"
+              className="group p-5 bg-card rounded-2xl border border-border hover:border-primary/30 hover:shadow-lg transition-all duration-300 cursor-pointer"
             >
-              <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-3">
                 <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center", card.bgColor)}>
                   <Icon className={cn("w-5 h-5", card.textColor)} />
                 </div>
-                <span
-                  className={cn(
-                    "inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium",
-                    card.changeType === "positive"
-                      ? "bg-emerald-500/10 text-emerald-600"
-                      : "bg-red-500/10 text-red-600"
-                  )}
-                >
-                  {card.changeType === "positive" ? (
-                    <TrendingUp className="w-3 h-3" />
-                  ) : (
-                    <TrendingDown className="w-3 h-3" />
-                  )}
-                  {card.change}
-                </span>
+                <div className="flex-1">
+                  <div className="flex items-center justify-between">
+                    <p className="text-2xl font-bold text-foreground">{card.value}</p>
+                    <span
+                      className={cn(
+                        "inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-xs font-medium",
+                        card.changeType === "positive"
+                          ? "bg-emerald-500/10 text-emerald-600"
+                          : "bg-red-500/10 text-red-600"
+                      )}
+                    >
+                      {card.changeType === "positive" ? (
+                        <TrendingUp className="w-3 h-3" />
+                      ) : (
+                        <TrendingDown className="w-3 h-3" />
+                      )}
+                      {card.change}
+                    </span>
+                  </div>
+                  <p className="text-sm text-muted-foreground">{card.label}</p>
+                </div>
               </div>
-              <p className="text-3xl font-bold text-foreground">{card.value}</p>
-              <p className="text-sm text-muted-foreground mt-1">{card.label}</p>
             </div>
           )
         })}
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-wrap items-center gap-4 p-4 bg-card rounded-2xl border border-border">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Siparis veya masa ara..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 rounded-xl bg-muted/50 border-0"
-          />
-        </div>
-        <Select value={filterStatus} onValueChange={setFilterStatus}>
-          <SelectTrigger className="w-44 rounded-xl">
-            <Filter className="w-4 h-4 mr-2 text-muted-foreground" />
-            <SelectValue placeholder="Durum filtrele" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Tum Durumlar</SelectItem>
-            <SelectItem value="yeni">Yeni</SelectItem>
-            <SelectItem value="hazirlaniyor">Hazirlaniyor</SelectItem>
-            <SelectItem value="hazir">Hazir</SelectItem>
-            <SelectItem value="tamamlandi">Tamamlandi</SelectItem>
-          </SelectContent>
-        </Select>
-        <Button variant="outline" size="sm" className="rounded-xl gap-2">
-          <Download className="w-4 h-4" />
-          Disa Aktar
-        </Button>
-        <span className="text-sm text-muted-foreground ml-auto">
-          {filteredOrders.length} siparis
-        </span>
-      </div>
+      {/* Orders Table */}
+      <div className="bg-card rounded-2xl border border-border overflow-hidden">
+        <div className="flex flex-wrap items-center justify-between gap-4 p-4 border-b border-border">
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Siparis veya masa ara..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 w-64 bg-muted/50 border-0 rounded-xl"
+              />
+            </div>
+            <span className="text-sm text-muted-foreground">{filteredOrders.length} siparis</span>
+          </div>
 
-      {/* Active Orders Grid */}
-      {activeOrders.length > 0 && (
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
-            <Timer className="w-5 h-5 text-amber-500" />
-            Aktif Siparisler
-            <Badge variant="secondary" className="ml-2 rounded-lg">{activeOrders.length}</Badge>
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {activeOrders.map((order) => {
+          <div className="flex items-center gap-3">
+            <Select value={filterStatus} onValueChange={setFilterStatus}>
+              <SelectTrigger className="w-40 rounded-xl border-border">
+                <Filter className="w-4 h-4 mr-2 text-muted-foreground" />
+                <SelectValue placeholder="Durum" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tum Durumlar</SelectItem>
+                <SelectItem value="yeni">Yeni</SelectItem>
+                <SelectItem value="hazirlaniyor">Hazirlaniyor</SelectItem>
+                <SelectItem value="hazir">Hazir</SelectItem>
+                <SelectItem value="tamamlandi">Tamamlandi</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button variant="outline" size="sm" className="rounded-xl gap-2">
+              <Download className="w-4 h-4" />
+              Disa Aktar
+            </Button>
+            <Button variant="outline" size="sm" className="rounded-xl gap-2">
+              <SlidersHorizontal className="w-4 h-4" />
+              Sirala
+            </Button>
+          </div>
+        </div>
+
+        {filterStatus !== "all" && (
+          <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-muted/30">
+            <Filter className="w-4 h-4 text-muted-foreground" />
+            <Badge variant="secondary" className="gap-1 rounded-lg">
+              {statusConfig[filterStatus as keyof typeof statusConfig]?.label || filterStatus}
+              <X className="w-3 h-3 cursor-pointer" onClick={() => setFilterStatus("all")} />
+            </Badge>
+            <button 
+              className="text-sm text-muted-foreground hover:text-foreground"
+              onClick={() => setFilterStatus("all")}
+            >
+              Filtreyi temizle
+            </button>
+            <div className="ml-auto flex items-center gap-1 text-sm text-muted-foreground">
+              <span>1 / 1</span>
+              <button className="p-1 hover:bg-muted rounded-lg">
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <button className="p-1 hover:bg-muted rounded-lg">
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        <Table>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              <TableHead className="w-10">
+                <Checkbox />
+              </TableHead>
+              <TableHead className="text-xs font-medium text-muted-foreground uppercase">
+                Siparis
+              </TableHead>
+              <TableHead className="text-xs font-medium text-muted-foreground uppercase">
+                Masa
+              </TableHead>
+              <TableHead className="text-xs font-medium text-muted-foreground uppercase">
+                Urunler
+              </TableHead>
+              <TableHead className="text-xs font-medium text-muted-foreground uppercase">
+                Toplam
+              </TableHead>
+              <TableHead className="text-xs font-medium text-muted-foreground uppercase">
+                Garson
+              </TableHead>
+              <TableHead className="text-xs font-medium text-muted-foreground uppercase">
+                Saat
+              </TableHead>
+              <TableHead className="text-xs font-medium text-muted-foreground uppercase">
+                Durum
+              </TableHead>
+              <TableHead className="w-10" />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filteredOrders.map((order) => {
               const StatusIcon = statusConfig[order.status].icon
               return (
-                <div
-                  key={order.id}
+                <TableRow 
+                  key={order.id} 
                   className={cn(
-                    "group relative p-5 bg-card rounded-2xl border transition-all duration-300 hover:shadow-lg cursor-pointer",
-                    order.priority === "high"
-                      ? "border-amber-300 bg-amber-50/30"
-                      : "border-border hover:border-primary/30"
+                    "group",
+                    order.priority === "high" && "bg-amber-50/50"
                   )}
-                  onClick={() => setSelectedOrder(order)}
                 >
-                  {order.priority === "high" && (
-                    <div className="absolute -top-2 -right-2">
-                      <span className="flex h-5 w-5">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
-                        <span className="relative inline-flex rounded-full h-5 w-5 bg-amber-500 items-center justify-center">
-                          <AlertCircle className="w-3 h-3 text-white" />
-                        </span>
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Header */}
-                  <div className="flex items-start justify-between mb-4">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-lg font-bold text-foreground">{order.table}</span>
-                        <Badge
-                          variant="outline"
-                          className={cn("rounded-lg gap-1 font-normal", statusConfig[order.status].color)}
-                        >
-                          <StatusIcon className="w-3 h-3" />
-                          {statusConfig[order.status].label}
-                        </Badge>
+                  <TableCell>
+                    <Checkbox />
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-3">
+                      <div className={cn(
+                        "w-10 h-10 rounded-xl flex items-center justify-center",
+                        order.priority === "high" ? "bg-amber-500/10" : "bg-muted"
+                      )}>
+                        <Receipt className={cn(
+                          "w-5 h-5",
+                          order.priority === "high" ? "text-amber-600" : "text-muted-foreground"
+                        )} />
                       </div>
-                      <p className="text-sm text-muted-foreground mt-0.5">#{order.id}</p>
-                    </div>
-                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                      <Clock className="w-3.5 h-3.5" />
-                      {order.time}
-                    </div>
-                  </div>
-
-                  {/* Items */}
-                  <div className="space-y-2 mb-4">
-                    {order.items.slice(0, 3).map((item, idx) => (
-                      <div key={idx} className="flex items-center justify-between text-sm">
-                        <span className="text-foreground">
-                          {item.quantity}x {item.name}
-                          {item.notes && (
-                            <span className="text-xs text-amber-600 ml-1">({item.notes})</span>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-foreground">{order.id}</p>
+                          {order.priority === "high" && (
+                            <span className="flex h-2 w-2">
+                              <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-amber-400 opacity-75" />
+                              <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
+                            </span>
                           )}
-                        </span>
-                        <span className="text-muted-foreground">${item.price.toFixed(2)}</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {order.items.length} urun
+                        </p>
                       </div>
-                    ))}
-                    {order.items.length > 3 && (
-                      <p className="text-xs text-muted-foreground">
-                        +{order.items.length - 3} urun daha
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <MapPin className="w-3.5 h-3.5 text-muted-foreground" />
+                      <span className="font-medium text-foreground">{order.table}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="max-w-48">
+                      <p className="text-sm text-foreground truncate">
+                        {order.items.map(i => `${i.quantity}x ${i.name}`).join(", ")}
                       </p>
-                    )}
-                  </div>
-
-                  {/* Footer */}
-                  <div className="flex items-center justify-between pt-4 border-t border-border">
-                    <span className="text-sm text-muted-foreground">{order.waiter}</span>
-                    <span className="text-lg font-bold text-foreground">${order.total.toFixed(2)}</span>
-                  </div>
-                </div>
+                      {order.items.some(i => i.notes) && (
+                        <p className="text-xs text-amber-600 truncate">
+                          Not: {order.items.find(i => i.notes)?.notes}
+                        </p>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-lg font-semibold text-foreground">
+                      ${order.total.toFixed(2)}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center">
+                        <User className="w-3.5 h-3.5 text-muted-foreground" />
+                      </div>
+                      <span className="text-sm text-muted-foreground">{order.waiter}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1.5 text-muted-foreground">
+                      <Clock className="w-3.5 h-3.5" />
+                      <span className="text-sm">{order.time}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge
+                      variant="outline"
+                      className={cn("rounded-lg font-normal gap-1", statusConfig[order.status].color)}
+                    >
+                      <StatusIcon className="w-3 h-3" />
+                      {statusConfig[order.status].label}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="relative overflow-visible">
+                    <div className="relative flex justify-end" ref={openMenuId === order.id ? menuRef : null}>
+                      <button
+                        className="p-1.5 hover:bg-muted rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={(e) => {
+                          const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect()
+                          setOpenMenuId((prev) => (prev === order.id ? null : order.id))
+                          setMenuPosition({ top: rect.bottom + 6, left: rect.right - 144 })
+                        }}
+                      >
+                        <MoreHorizontal className="w-4 h-4 text-muted-foreground" />
+                      </button>
+                    </div>
+                  </TableCell>
+                </TableRow>
               )
             })}
-          </div>
-        </div>
-      )}
+          </TableBody>
+        </Table>
 
-      {/* Completed Orders */}
-      {completedOrders.length > 0 && (
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
-            <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-            Tamamlanan Siparisler
-            <Badge variant="secondary" className="ml-2 rounded-lg">{completedOrders.length}</Badge>
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {completedOrders.map((order) => (
-              <div
-                key={order.id}
-                className="group p-5 bg-card/50 rounded-2xl border border-border opacity-75 hover:opacity-100 transition-all cursor-pointer"
-                onClick={() => setSelectedOrder(order)}
-              >
-                <div className="flex items-start justify-between mb-3">
-                  <div>
-                    <span className="text-lg font-semibold text-foreground">{order.table}</span>
-                    <p className="text-sm text-muted-foreground">#{order.id}</p>
-                  </div>
-                  <Badge variant="outline" className="rounded-lg font-normal bg-slate-500/10 text-slate-600">
-                    Tamamlandi
-                  </Badge>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">{order.items.length} urun - {order.waiter}</span>
-                  <span className="font-semibold text-foreground">${order.total.toFixed(2)}</span>
-                </div>
-              </div>
-            ))}
+        {filteredOrders.length === 0 && (
+          <div className="text-center py-12">
+            <UtensilsCrossed className="w-12 h-12 mx-auto text-muted-foreground/50" />
+            <p className="mt-4 text-muted-foreground">Siparis bulunamadi</p>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
-      {filteredOrders.length === 0 && (
-        <div className="text-center py-12">
-          <UtensilsCrossed className="w-12 h-12 mx-auto text-muted-foreground/50" />
-          <p className="mt-4 text-muted-foreground">Siparis bulunamadi</p>
+      {/* Dropdown Menu */}
+      {openMenuId && menuPosition && (
+        <div
+          ref={menuRef}
+          className="fixed w-36 rounded-xl border border-border bg-popover shadow-xl z-[100] p-1.5 animate-in fade-in-0 zoom-in-95"
+          style={{ top: menuPosition.top, left: menuPosition.left }}
+        >
+          <button
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg hover:bg-muted transition-colors"
+            onClick={() => {
+              const order = orders.find(o => o.id === openMenuId)
+              if (order) setSelectedOrder(order)
+              setOpenMenuId(null)
+            }}
+          >
+            <Eye className="w-3.5 h-3.5" />
+            Detay Gor
+          </button>
+          <button
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg hover:bg-muted transition-colors"
+            onClick={() => setOpenMenuId(null)}
+          >
+            <Edit3 className="w-3.5 h-3.5" />
+            Duzenle
+          </button>
+          <button
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg text-red-600 hover:bg-red-50 transition-colors"
+            onClick={() => setOpenMenuId(null)}
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            Iptal Et
+          </button>
         </div>
       )}
 
@@ -427,22 +542,33 @@ export function OrdersView() {
             {/* Header */}
             <div className={cn(
               "px-6 py-5 border-b border-border",
-              selectedOrder.priority === "high" ? "bg-amber-500/5" : "bg-primary/5"
+              selectedOrder.priority === "high" ? "bg-gradient-to-r from-amber-500/10 to-transparent" : "bg-gradient-to-r from-primary/5 to-transparent"
             )}>
               <div className="flex items-center justify-between">
-                <div>
-                  <div className="flex items-center gap-3">
-                    <h2 className="text-xl font-semibold text-foreground">{selectedOrder.table}</h2>
-                    <Badge
-                      variant="outline"
-                      className={cn("rounded-lg gap-1", statusConfig[selectedOrder.status].color)}
-                    >
-                      {statusConfig[selectedOrder.status].label}
-                    </Badge>
+                <div className="flex items-center gap-3">
+                  <div className={cn(
+                    "w-10 h-10 rounded-xl flex items-center justify-center",
+                    selectedOrder.priority === "high" ? "bg-amber-500/10" : "bg-primary/10"
+                  )}>
+                    <Receipt className={cn(
+                      "w-5 h-5",
+                      selectedOrder.priority === "high" ? "text-amber-600" : "text-primary"
+                    )} />
                   </div>
-                  <p className="text-sm text-muted-foreground mt-0.5">
-                    #{selectedOrder.id} - {selectedOrder.time}
-                  </p>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-xl font-semibold text-foreground">{selectedOrder.table}</h2>
+                      <Badge
+                        variant="outline"
+                        className={cn("rounded-lg gap-1", statusConfig[selectedOrder.status].color)}
+                      >
+                        {statusConfig[selectedOrder.status].label}
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      #{selectedOrder.id} - {selectedOrder.time}
+                    </p>
+                  </div>
                 </div>
                 <button
                   onClick={() => setSelectedOrder(null)}
