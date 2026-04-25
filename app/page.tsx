@@ -11,6 +11,7 @@ import { InventoryView } from "@/components/dashboard/inventory-view"
 import { LoginForm } from "@/components/auth/login-form"
 import { RegisterForm } from "@/components/auth/register-form"
 import { UsersView } from "@/components/dashboard/users-view"
+import { ReservationsView } from "@/components/dashboard/reservations-view"
 import { loginWithApi } from "@/lib/services/auth-service"
 
 type AuthState = "login" | "register" | "authenticated"
@@ -119,12 +120,7 @@ export default function Dashboard() {
       case "users":
         return <UsersView />
       case "reservations":
-        return (
-          <div className="p-6">
-            <h1 className="text-2xl font-semibold text-foreground">Rezervasyonlar</h1>
-            <p className="text-muted-foreground mt-2">Admin rezervasyonlari bu alanda takip eder.</p>
-          </div>
-        )
+        return <ReservationsView />
       case "customers":
         return (
           <div className="p-6">
