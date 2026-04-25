@@ -12,6 +12,7 @@ import { LoginForm } from "@/components/auth/login-form"
 import { RegisterForm } from "@/components/auth/register-form"
 import { UsersView } from "@/components/dashboard/users-view"
 import { ReservationsView } from "@/components/dashboard/reservations-view"
+import { PerformanceView } from "@/components/dashboard/performance-view"
 import { loginWithApi } from "@/lib/services/auth-service"
 
 type AuthState = "login" | "register" | "authenticated"
@@ -121,6 +122,8 @@ export default function Dashboard() {
         return <UsersView />
       case "reservations":
         return <ReservationsView />
+      case "performance":
+        return <PerformanceView />
       case "customers":
         return (
           <div className="p-6">
