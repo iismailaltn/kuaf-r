@@ -1,17 +1,56 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
-import { Plus, Users, Clock, Scissors, X, Pencil, Trash2, Save, MapPin } from "lucide-react"
+import { 
+  Plus, Users, Clock, Scissors, X, Pencil, Trash2, Save, MapPin, 
+  User, FileText, Camera, Upload, Instagram, Globe, Play, CheckCircle 
+} from "lucide-react"
 
 interface Table {
   id: number
   name: string
   status: "available" | "occupied" | "reserved" | "cleaning"
   occupiedSince?: number
+  sessionData?: SessionData
 }
+
+interface SessionData {
+  customerName: string
+  customerSurname: string
+  services: string[]
+  staffId: string
+  staffName: string
+  notes: string
+  startTime: number
+}
+
+// Hizmet seçenekleri (users-view.tsx'deki specialtyOptions ile aynı)
+const serviceOptions = [
+  "Sac Kesimi",
+  "Sac Boyama",
+  "Fon",
+  "Manikur",
+  "Pedikur",
+  "Cilt Bakimi",
+  "Makyaj",
+  "Kas Dizayn",
+  "Agda",
+  "Sakal Kesimi",
+]
+
+// Örnek personel listesi
+const staffList = [
+  { id: "EMP001", name: "Ahmet Yilmaz", specialties: ["Sac Kesimi", "Sakal Kesimi"] },
+  { id: "EMP002", name: "Ayse Kaya", specialties: ["Sac Boyama", "Fon", "Makyaj"] },
+  { id: "EMP003", name: "Mehmet Demir", specialties: ["Sac Kesimi", "Sac Boyama"] },
+  { id: "EMP004", name: "Fatma Celik", specialties: ["Manikur", "Pedikur", "Cilt Bakimi"] },
+  { id: "EMP005", name: "Ali Ozturk", specialties: ["Kas Dizayn", "Agda"] },
+]
 
 const initialTables: Table[] = [
   { id: 1, name: "Calisma Alani 1", status: "occupied", occupiedSince: Date.now() - 45 * 60 * 1000 },
@@ -44,6 +83,28 @@ export function TablesView({ canManage = false }: TablesViewProps) {
   const [now, setNow] = useState(Date.now())
   const [editingTableId, setEditingTableId] = useState<number | null>(null)
   const [editingName, setEditingName] = useState("")
+
+  // Session start modal state
+  const [showStartSessionModal, setShowStartSessionModal] = useState(false)
+  const [startSessionTableId, setStartSessionTableId] = useState<number | null>(null)
+  const [sessionForm, setSessionForm] = useState({
+    customerName: "",
+    customerSurname: "",
+    services: [] as string[],
+    staffId: "",
+    notes: "",
+  })
+
+  // Session end modal state
+  const [showEndSessionModal, setShowEndSessionModal] = useState(false)
+  const [endSessionTableId, setEndSessionTableId] = useState<number | null>(null)
+  const [sessionPhoto, setSessionPhoto] = useState<string | null>(null)
+  const [shareOnInstagram, setShareOnInstagram] = useState(false)
+  const [shareOnWebsite, setShareOnWebsite] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const [isCameraActive, setIsCameraActive] = useState(false)
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null)
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000)
@@ -105,7 +166,7 @@ export function TablesView({ canManage = false }: TablesViewProps) {
     ])
   }
 
-  const handleSetStatus = async (id: number, status: Table["status"]) => {
+  const handleSetStatus = async (id: number, status: Table["status"], sessionData?: SessionData) => {
     const current = tables.find((table) => table.id === id)
     if (!current) return
     const res = await fetch(`/api/workspaces/${id}`, {
@@ -128,11 +189,165 @@ export function TablesView({ canManage = false }: TablesViewProps) {
           ? {
               ...table,
               status,
-              occupiedSince: status === "occupied" ? (table.occupiedSince ?? Date.now()) : undefined,
+              occupiedSince: status === "occupied" ? Date.now() : undefined,
+              sessionData: status === "occupied" ? sessionData : undefined,
             }
           : table
       )
     )
+  }
+
+  // Open start session modal
+  const openStartSessionModal = (tableId: number) => {
+    setStartSessionTableId(tableId)
+    setSessionForm({
+      customerName: "",
+      customerSurname: "",
+      services: [],
+      staffId: "",
+      notes: "",
+    })
+    setShowStartSessionModal(true)
+  }
+
+  // Close start session modal
+  const closeStartSessionModal = () => {
+    setShowStartSessionModal(false)
+    setStartSessionTableId(null)
+    setSessionForm({
+      customerName: "",
+      customerSurname: "",
+      services: [],
+      staffId: "",
+      notes: "",
+    })
+  }
+
+  // Toggle service selection
+  const toggleService = (service: string) => {
+    if (sessionForm.services.includes(service)) {
+      setSessionForm({ ...sessionForm, services: sessionForm.services.filter((s) => s !== service) })
+    } else {
+      setSessionForm({ ...sessionForm, services: [...sessionForm.services, service] })
+    }
+  }
+
+  // Start session
+  const handleStartSession = () => {
+    if (!startSessionTableId) return
+    if (!sessionForm.customerName.trim() || !sessionForm.customerSurname.trim()) {
+      alert("Lutfen musteri adi ve soyadini girin.")
+      return
+    }
+    if (sessionForm.services.length === 0) {
+      alert("Lutfen en az bir hizmet secin.")
+      return
+    }
+    if (!sessionForm.staffId) {
+      alert("Lutfen personel secin.")
+      return
+    }
+
+    const selectedStaff = staffList.find((s) => s.id === sessionForm.staffId)
+    const sessionData: SessionData = {
+      customerName: sessionForm.customerName.trim(),
+      customerSurname: sessionForm.customerSurname.trim(),
+      services: sessionForm.services,
+      staffId: sessionForm.staffId,
+      staffName: selectedStaff?.name ?? "",
+      notes: sessionForm.notes.trim(),
+      startTime: Date.now(),
+    }
+
+    handleSetStatus(startSessionTableId, "occupied", sessionData)
+    closeStartSessionModal()
+  }
+
+  // Open end session modal
+  const openEndSessionModal = (tableId: number) => {
+    setEndSessionTableId(tableId)
+    setSessionPhoto(null)
+    setShareOnInstagram(false)
+    setShareOnWebsite(false)
+    setShowEndSessionModal(true)
+  }
+
+  // Close end session modal
+  const closeEndSessionModal = () => {
+    stopCamera()
+    setShowEndSessionModal(false)
+    setEndSessionTableId(null)
+    setSessionPhoto(null)
+    setShareOnInstagram(false)
+    setShareOnWebsite(false)
+  }
+
+  // Handle photo upload
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setSessionPhoto(reader.result as string)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  // Start camera
+  const startCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { facingMode: "environment" } 
+      })
+      setCameraStream(stream)
+      setIsCameraActive(true)
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream
+      }
+    } catch {
+      alert("Kamera erisimi saglanamadi.")
+    }
+  }
+
+  // Stop camera
+  const stopCamera = () => {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach((track) => track.stop())
+      setCameraStream(null)
+    }
+    setIsCameraActive(false)
+  }
+
+  // Capture photo from camera
+  const capturePhoto = () => {
+    if (videoRef.current) {
+      const canvas = document.createElement("canvas")
+      canvas.width = videoRef.current.videoWidth
+      canvas.height = videoRef.current.videoHeight
+      const ctx = canvas.getContext("2d")
+      if (ctx) {
+        ctx.drawImage(videoRef.current, 0, 0)
+        setSessionPhoto(canvas.toDataURL("image/jpeg"))
+        stopCamera()
+      }
+    }
+  }
+
+  // End session
+  const handleEndSession = () => {
+    if (!endSessionTableId) return
+    
+    // TODO: Burada paylaşım işlemleri yapılabilir
+    if (shareOnInstagram && sessionPhoto) {
+      console.log("Instagram'da paylasilacak")
+    }
+    if (shareOnWebsite && sessionPhoto) {
+      console.log("Web sitesinde paylasilacak")
+    }
+
+    handleSetStatus(endSessionTableId, "cleaning")
+    closeEndSessionModal()
   }
 
   const openEditCard = (id: number) => {
@@ -193,7 +408,7 @@ export function TablesView({ canManage = false }: TablesViewProps) {
     if (table.status === "available") {
       return {
         label: "Seansi baslat",
-        onClick: () => handleSetStatus(table.id, "occupied"),
+        onClick: () => openStartSessionModal(table.id),
         className:
           "w-full mt-3 rounded-lg bg-lime-600 hover:bg-lime-700 text-white border-lime-600",
       }
@@ -202,7 +417,7 @@ export function TablesView({ canManage = false }: TablesViewProps) {
     if (table.status === "occupied") {
       return {
         label: "Seansi bitir",
-        onClick: () => handleSetStatus(table.id, "cleaning"),
+        onClick: () => openEndSessionModal(table.id),
         className:
           "w-full mt-3 rounded-lg bg-red-500 hover:bg-red-600 text-white border-red-500",
       }
@@ -219,7 +434,7 @@ export function TablesView({ canManage = false }: TablesViewProps) {
 
     return {
       label: "Seansi baslat",
-      onClick: () => handleSetStatus(table.id, "occupied"),
+      onClick: () => openStartSessionModal(table.id),
       className:
         "w-full mt-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600",
     }
@@ -295,13 +510,29 @@ export function TablesView({ canManage = false }: TablesViewProps) {
               </div>
 
               {table.status === "occupied" && (
-                <div className="space-y-1 pt-2 border-t border-border/50">
+                <div className="space-y-2 pt-2 border-t border-border/50">
                   <div className="flex items-center gap-1 text-xs text-muted-foreground">
                     <Clock className="w-3 h-3" />
                     <span>
                       {Math.max(0, Math.floor((now - (table.occupiedSince ?? now)) / 60000))} dk gecti
                     </span>
                   </div>
+                  {table.sessionData && (
+                    <div className="space-y-1.5 text-xs">
+                      <div className="flex items-center gap-1.5 text-foreground font-medium">
+                        <User className="w-3 h-3 text-primary" />
+                        <span>{table.sessionData.customerName} {table.sessionData.customerSurname}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-muted-foreground">
+                        <Scissors className="w-3 h-3" />
+                        <span className="truncate">{table.sessionData.services.join(", ")}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-muted-foreground">
+                        <Users className="w-3 h-3" />
+                        <span>{table.sessionData.staffName}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -420,6 +651,363 @@ export function TablesView({ canManage = false }: TablesViewProps) {
                       Sil
                     </Button>
                   </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* Start Session Modal */}
+      {showStartSessionModal && startSessionTableId !== null && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-card rounded-3xl shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="sticky top-0 z-10 relative bg-gradient-to-br from-lime-600 to-emerald-600 px-6 py-5">
+              <button
+                onClick={closeStartSessionModal}
+                className="absolute top-4 right-4 p-1.5 rounded-full bg-white/20 hover:bg-white/30 transition-colors"
+              >
+                <X className="w-4 h-4 text-white" />
+              </button>
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center">
+                  <Play className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-white">Seans Baslat</h2>
+                  <p className="text-sm text-white/70">
+                    {tables.find((t) => t.id === startSessionTableId)?.name}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Form */}
+            <div className="p-6 space-y-6">
+              {/* Customer Info */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                  <User className="w-4 h-4" />
+                  Musteri Bilgileri
+                </h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">Ad *</label>
+                    <Input
+                      placeholder="Musteri adi"
+                      value={sessionForm.customerName}
+                      onChange={(e) => setSessionForm({ ...sessionForm, customerName: e.target.value })}
+                      className="rounded-xl h-11"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">Soyad *</label>
+                    <Input
+                      placeholder="Musteri soyadi"
+                      value={sessionForm.customerSurname}
+                      onChange={(e) => setSessionForm({ ...sessionForm, customerSurname: e.target.value })}
+                      className="rounded-xl h-11"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Services Selection */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                  <Scissors className="w-4 h-4" />
+                  Yapilacak Islemler *
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {serviceOptions.map((service) => (
+                    <button
+                      key={service}
+                      type="button"
+                      onClick={() => toggleService(service)}
+                      className={cn(
+                        "px-4 py-2 rounded-xl text-sm font-medium transition-all",
+                        sessionForm.services.includes(service)
+                          ? "bg-emerald-600 text-white shadow-lg shadow-emerald-600/25"
+                          : "bg-muted hover:bg-muted/80 text-muted-foreground"
+                      )}
+                    >
+                      {service}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Staff Selection */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                  <Users className="w-4 h-4" />
+                  Personel Secimi *
+                </h3>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {staffList.map((staff) => (
+                    <button
+                      key={staff.id}
+                      type="button"
+                      onClick={() => setSessionForm({ ...sessionForm, staffId: staff.id })}
+                      className={cn(
+                        "p-3 rounded-xl text-left transition-all border-2",
+                        sessionForm.staffId === staff.id
+                          ? "bg-emerald-50 border-emerald-500 text-emerald-700"
+                          : "bg-muted/50 border-transparent hover:border-muted-foreground/20"
+                      )}
+                    >
+                      <div className="font-medium text-sm">{staff.name}</div>
+                      <div className="text-xs text-muted-foreground mt-1 truncate">
+                        {staff.specialties.slice(0, 2).join(", ")}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Notes */}
+              <div className="space-y-2">
+                <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                  <FileText className="w-4 h-4" />
+                  Notlar
+                </h3>
+                <Textarea
+                  placeholder="Seans ile ilgili notlar..."
+                  value={sessionForm.notes}
+                  onChange={(e) => setSessionForm({ ...sessionForm, notes: e.target.value })}
+                  className="rounded-xl min-h-20 resize-none"
+                />
+              </div>
+
+              {/* Action Button */}
+              <div className="pt-4">
+                <Button
+                  className="w-full h-12 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-medium gap-2 shadow-lg shadow-emerald-600/25"
+                  onClick={handleStartSession}
+                >
+                  <Play className="w-4 h-4" />
+                  Seansi Baslat
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* End Session Modal */}
+      {showEndSessionModal && endSessionTableId !== null && (() => {
+        const currentTable = tables.find((t) => t.id === endSessionTableId)
+        return (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto bg-card rounded-3xl shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+              {/* Header */}
+              <div className="sticky top-0 z-10 relative bg-gradient-to-br from-red-500 to-rose-600 px-6 py-5">
+                <button
+                  onClick={closeEndSessionModal}
+                  className="absolute top-4 right-4 p-1.5 rounded-full bg-white/20 hover:bg-white/30 transition-colors"
+                >
+                  <X className="w-4 h-4 text-white" />
+                </button>
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center">
+                    <CheckCircle className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-semibold text-white">Seansi Bitir</h2>
+                    <p className="text-sm text-white/70">{currentTable?.name}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Session Info */}
+              {currentTable?.sessionData && (
+                <div className="px-6 pt-4">
+                  <div className="p-4 rounded-xl bg-muted/50 space-y-2">
+                    <div className="flex items-center gap-2 text-sm">
+                      <User className="w-4 h-4 text-muted-foreground" />
+                      <span className="font-medium">
+                        {currentTable.sessionData.customerName} {currentTable.sessionData.customerSurname}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Scissors className="w-4 h-4" />
+                      <span>{currentTable.sessionData.services.join(", ")}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Clock className="w-4 h-4" />
+                      <span>
+                        Sure: {Math.max(0, Math.floor((now - currentTable.sessionData.startTime) / 60000))} dakika
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Content */}
+              <div className="p-6 space-y-6">
+                {/* Photo Section */}
+                <div className="space-y-4">
+                  <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                    <Camera className="w-4 h-4" />
+                    Fotograf
+                  </h3>
+
+                  {/* Photo Preview */}
+                  {sessionPhoto && (
+                    <div className="relative rounded-xl overflow-hidden">
+                      <img
+                        src={sessionPhoto}
+                        alt="Seans fotografı"
+                        className="w-full h-48 object-cover"
+                      />
+                      <button
+                        onClick={() => setSessionPhoto(null)}
+                        className="absolute top-2 right-2 p-1.5 rounded-full bg-black/50 hover:bg-black/70 transition-colors"
+                      >
+                        <X className="w-4 h-4 text-white" />
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Camera Preview */}
+                  {isCameraActive && (
+                    <div className="relative rounded-xl overflow-hidden">
+                      <video
+                        ref={videoRef}
+                        autoPlay
+                        playsInline
+                        className="w-full h-48 object-cover"
+                      />
+                      <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-3">
+                        <Button
+                          size="sm"
+                          className="rounded-full bg-white text-black hover:bg-white/90"
+                          onClick={capturePhoto}
+                        >
+                          <Camera className="w-4 h-4 mr-1" />
+                          Cek
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="rounded-full bg-black/50 text-white border-white/30 hover:bg-black/70"
+                          onClick={stopCamera}
+                        >
+                          <X className="w-4 h-4 mr-1" />
+                          Iptal
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Photo Upload/Capture Buttons */}
+                  {!sessionPhoto && !isCameraActive && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <Button
+                        variant="outline"
+                        className="h-20 rounded-xl border-2 border-dashed flex flex-col gap-2"
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        <Upload className="w-6 h-6 text-muted-foreground" />
+                        <span className="text-sm text-muted-foreground">Fotograf Yukle</span>
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="h-20 rounded-xl border-2 border-dashed flex flex-col gap-2"
+                        onClick={startCamera}
+                      >
+                        <Camera className="w-6 h-6 text-muted-foreground" />
+                        <span className="text-sm text-muted-foreground">Fotograf Cek</span>
+                      </Button>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handlePhotoUpload}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Share Options */}
+                <div className="space-y-4">
+                  <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+                    Paylasim Secenekleri
+                  </h3>
+                  <div className="space-y-3">
+                    <button
+                      type="button"
+                      onClick={() => setShareOnInstagram(!shareOnInstagram)}
+                      className={cn(
+                        "w-full p-4 rounded-xl flex items-center gap-3 transition-all border-2",
+                        shareOnInstagram
+                          ? "bg-gradient-to-r from-purple-500/10 to-pink-500/10 border-pink-500"
+                          : "bg-muted/50 border-transparent hover:border-muted-foreground/20"
+                      )}
+                    >
+                      <div className={cn(
+                        "w-10 h-10 rounded-xl flex items-center justify-center",
+                        shareOnInstagram ? "bg-gradient-to-br from-purple-500 to-pink-500" : "bg-muted"
+                      )}>
+                        <Instagram className={cn("w-5 h-5", shareOnInstagram ? "text-white" : "text-muted-foreground")} />
+                      </div>
+                      <div className="text-left">
+                        <div className={cn("font-medium text-sm", shareOnInstagram ? "text-pink-600" : "text-foreground")}>
+                          Instagram&apos;da Paylas
+                        </div>
+                        <div className="text-xs text-muted-foreground">Calismanizi Instagram&apos;da paylasin</div>
+                      </div>
+                      <div className={cn(
+                        "ml-auto w-5 h-5 rounded-full border-2 flex items-center justify-center",
+                        shareOnInstagram ? "border-pink-500 bg-pink-500" : "border-muted-foreground/30"
+                      )}>
+                        {shareOnInstagram && <CheckCircle className="w-3 h-3 text-white" />}
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setShareOnWebsite(!shareOnWebsite)}
+                      className={cn(
+                        "w-full p-4 rounded-xl flex items-center gap-3 transition-all border-2",
+                        shareOnWebsite
+                          ? "bg-blue-500/10 border-blue-500"
+                          : "bg-muted/50 border-transparent hover:border-muted-foreground/20"
+                      )}
+                    >
+                      <div className={cn(
+                        "w-10 h-10 rounded-xl flex items-center justify-center",
+                        shareOnWebsite ? "bg-blue-500" : "bg-muted"
+                      )}>
+                        <Globe className={cn("w-5 h-5", shareOnWebsite ? "text-white" : "text-muted-foreground")} />
+                      </div>
+                      <div className="text-left">
+                        <div className={cn("font-medium text-sm", shareOnWebsite ? "text-blue-600" : "text-foreground")}>
+                          Web Sitesinde Paylas
+                        </div>
+                        <div className="text-xs text-muted-foreground">Galeri sayfasinda goruntuleyin</div>
+                      </div>
+                      <div className={cn(
+                        "ml-auto w-5 h-5 rounded-full border-2 flex items-center justify-center",
+                        shareOnWebsite ? "border-blue-500 bg-blue-500" : "border-muted-foreground/30"
+                      )}>
+                        {shareOnWebsite && <CheckCircle className="w-3 h-3 text-white" />}
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Action Button */}
+                <div className="pt-4">
+                  <Button
+                    className="w-full h-12 rounded-xl bg-red-500 hover:bg-red-600 text-white font-medium gap-2 shadow-lg shadow-red-500/25"
+                    onClick={handleEndSession}
+                  >
+                    <CheckCircle className="w-4 h-4" />
+                    Seansi Bitir
+                  </Button>
                 </div>
               </div>
             </div>
