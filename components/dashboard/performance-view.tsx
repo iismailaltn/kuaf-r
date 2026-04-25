@@ -19,7 +19,7 @@ import {
   AreaChart,
   Area,
 } from "recharts"
-import { TrendingUp, Users, Clock, Scissors, DollarSign, Calendar } from "lucide-react"
+import { TrendingUp, Users, Clock, Scissors, DollarSign, ChevronLeft, ChevronRight } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 type Period = "daily" | "monthly" | "yearly"
@@ -36,164 +36,257 @@ const COLORS = {
   lime: "#84cc16",
 }
 
-// Calisanlar islem sayisi verisi
-const employeePerformanceDaily = [
-  { name: "Ahmet Y.", islem: 8, renk: COLORS.primary },
-  { name: "Ayse K.", islem: 12, renk: COLORS.secondary },
-  { name: "Mehmet D.", islem: 6, renk: COLORS.tertiary },
-  { name: "Fatma C.", islem: 10, renk: COLORS.quaternary },
-  { name: "Ali O.", islem: 7, renk: COLORS.purple },
+// Ay isimleri
+const MONTHS = ["Ocak", "Subat", "Mart", "Nisan", "Mayis", "Haziran", "Temmuz", "Agustos", "Eylul", "Ekim", "Kasim", "Aralik"]
+const MONTHS_SHORT = ["Oca", "Sub", "Mar", "Nis", "May", "Haz", "Tem", "Agu", "Eyl", "Eki", "Kas", "Ara"]
+const DAYS = ["Pazar", "Pazartesi", "Sali", "Carsamba", "Persembe", "Cuma", "Cumartesi"]
+const DAYS_SHORT = ["Paz", "Pzt", "Sal", "Car", "Per", "Cum", "Cmt"]
+
+// Calisan verileri
+const employees = [
+  { id: 1, name: "Ahmet Y.", renk: COLORS.primary },
+  { id: 2, name: "Ayse K.", renk: COLORS.secondary },
+  { id: 3, name: "Mehmet D.", renk: COLORS.tertiary },
+  { id: 4, name: "Fatma C.", renk: COLORS.quaternary },
+  { id: 5, name: "Ali O.", renk: COLORS.purple },
 ]
 
-const employeePerformanceMonthly = [
-  { name: "Ahmet Y.", islem: 156, renk: COLORS.primary },
-  { name: "Ayse K.", islem: 248, renk: COLORS.secondary },
-  { name: "Mehmet D.", islem: 132, renk: COLORS.tertiary },
-  { name: "Fatma C.", islem: 198, renk: COLORS.quaternary },
-  { name: "Ali O.", islem: 145, renk: COLORS.purple },
-]
+// Calisan islem verisi uretici
+const generateEmployeeData = (date: Date, period: Period) => {
+  const seed = date.getDate() + date.getMonth() * 31 + date.getFullYear()
+  return employees.map((emp, idx) => ({
+    name: emp.name,
+    islem: period === "daily" 
+      ? Math.floor(5 + ((seed * (idx + 1)) % 12))
+      : period === "monthly"
+        ? Math.floor(120 + ((seed * (idx + 1)) % 150))
+        : Math.floor(1500 + ((seed * (idx + 1)) % 1500)),
+    renk: emp.renk,
+  }))
+}
 
-const employeePerformanceYearly = [
-  { name: "Ahmet Y.", islem: 1872, renk: COLORS.primary },
-  { name: "Ayse K.", islem: 2976, renk: COLORS.secondary },
-  { name: "Mehmet D.", islem: 1584, renk: COLORS.tertiary },
-  { name: "Fatma C.", islem: 2376, renk: COLORS.quaternary },
-  { name: "Ali O.", islem: 1740, renk: COLORS.purple },
-]
+// Ortalama islem suresi verisi
+const generateDurationData = (date: Date) => {
+  const seed = date.getDate() + date.getMonth() * 31
+  return employees.map((emp, idx) => ({
+    name: emp.name,
+    sure: 25 + ((seed * (idx + 1)) % 35),
+    hedef: 30 + (idx % 3) * 10,
+  }))
+}
 
-// Ortalama islem sureleri (dakika)
-const avgDurationData = [
-  { name: "Ahmet Y.", sure: 35, hedef: 30 },
-  { name: "Ayse K.", sure: 42, hedef: 45 },
-  { name: "Mehmet D.", sure: 28, hedef: 30 },
-  { name: "Fatma C.", sure: 55, hedef: 50 },
-  { name: "Ali O.", sure: 25, hedef: 25 },
-]
+// Gunluk islem grafigi verisi (son 7 gun)
+const generateDailyOperations = (date: Date) => {
+  const result = []
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(date)
+    d.setDate(d.getDate() - i)
+    const dayName = DAYS_SHORT[d.getDay()]
+    const seed = d.getDate() + d.getMonth() * 31
+    result.push({
+      gun: `${d.getDate()} ${dayName}`,
+      islem: 20 + (seed % 50),
+      musteri: 15 + (seed % 40),
+    })
+  }
+  return result
+}
 
-// Gunluk islem grafigi (son 7 gun)
-const dailyOperationsData = [
-  { gun: "Pzt", islem: 32, musteri: 28 },
-  { gun: "Sal", islem: 28, musteri: 24 },
-  { gun: "Car", islem: 35, musteri: 30 },
-  { gun: "Per", islem: 42, musteri: 38 },
-  { gun: "Cum", islem: 56, musteri: 48 },
-  { gun: "Cmt", islem: 68, musteri: 58 },
-  { gun: "Paz", islem: 24, musteri: 20 },
-]
+// Aylik islem grafigi verisi (12 ay)
+const generateMonthlyOperations = (year: number) => {
+  return MONTHS_SHORT.map((ay, idx) => {
+    const seed = idx + year
+    return {
+      ay,
+      islem: 600 + (seed * 37 % 500),
+      musteri: 500 + (seed * 29 % 400),
+    }
+  })
+}
 
-// Aylik islem grafigi (son 12 ay)
-const monthlyOperationsData = [
-  { ay: "Oca", islem: 680, musteri: 580 },
-  { ay: "Sub", islem: 620, musteri: 520 },
-  { ay: "Mar", islem: 750, musteri: 640 },
-  { ay: "Nis", islem: 820, musteri: 700 },
-  { ay: "May", islem: 890, musteri: 760 },
-  { ay: "Haz", islem: 950, musteri: 820 },
-  { ay: "Tem", islem: 1020, musteri: 880 },
-  { ay: "Agu", islem: 980, musteri: 840 },
-  { ay: "Eyl", islem: 920, musteri: 790 },
-  { ay: "Eki", islem: 880, musteri: 750 },
-  { ay: "Kas", islem: 840, musteri: 720 },
-  { ay: "Ara", islem: 920, musteri: 780 },
-]
-
-// Yillik islem grafigi (son 5 yil)
-const yearlyOperationsData = [
-  { yil: "2020", islem: 8200, musteri: 7000 },
-  { yil: "2021", islem: 9100, musteri: 7800 },
-  { yil: "2022", islem: 10500, musteri: 9000 },
-  { yil: "2023", islem: 11200, musteri: 9600 },
-  { yil: "2024", islem: 12400, musteri: 10600 },
-]
+// Yillik islem grafigi verisi (son 5 yil)
+const generateYearlyOperations = (currentYear: number) => {
+  const result = []
+  for (let i = 4; i >= 0; i--) {
+    const year = currentYear - i
+    const seed = year
+    result.push({
+      yil: year.toString(),
+      islem: 8000 + (seed * 123 % 5000),
+      musteri: 6500 + (seed * 97 % 4000),
+    })
+  }
+  return result
+}
 
 // En cok kazandiran islemler
-const revenueByServiceData = [
-  { name: "Sac Boyama", kazanc: 48500, renk: COLORS.primary },
-  { name: "Sac Kesimi", kazanc: 32000, renk: COLORS.secondary },
-  { name: "Fon", kazanc: 28500, renk: COLORS.tertiary },
-  { name: "Manikur/Pedikur", kazanc: 18200, renk: COLORS.quaternary },
-  { name: "Cilt Bakimi", kazanc: 15800, renk: COLORS.purple },
-  { name: "Makyaj", kazanc: 12400, renk: COLORS.pink },
-  { name: "Agda", kazanc: 8600, renk: COLORS.cyan },
-  { name: "Kas Dizayn", kazanc: 6200, renk: COLORS.lime },
-]
+const generateRevenueByService = (date: Date, period: Period) => {
+  const seed = date.getDate() + date.getMonth() * 31 + date.getFullYear()
+  const multiplier = period === "daily" ? 1 : period === "monthly" ? 30 : 365
+  return [
+    { name: "Sac Boyama", kazanc: Math.floor((1500 + (seed % 500)) * multiplier / 30), renk: COLORS.primary },
+    { name: "Sac Kesimi", kazanc: Math.floor((1200 + (seed % 400)) * multiplier / 30), renk: COLORS.secondary },
+    { name: "Fon", kazanc: Math.floor((900 + (seed % 300)) * multiplier / 30), renk: COLORS.tertiary },
+    { name: "Manikur/Pedikur", kazanc: Math.floor((600 + (seed % 200)) * multiplier / 30), renk: COLORS.quaternary },
+    { name: "Cilt Bakimi", kazanc: Math.floor((500 + (seed % 200)) * multiplier / 30), renk: COLORS.purple },
+    { name: "Makyaj", kazanc: Math.floor((400 + (seed % 150)) * multiplier / 30), renk: COLORS.pink },
+    { name: "Agda", kazanc: Math.floor((300 + (seed % 100)) * multiplier / 30), renk: COLORS.cyan },
+    { name: "Kas Dizayn", kazanc: Math.floor((200 + (seed % 80)) * multiplier / 30), renk: COLORS.lime },
+  ]
+}
 
-// Ciro ve net kazanc (aylik)
-const revenueData = [
-  { ay: "Oca", ciro: 42000, net: 28000, gider: 14000 },
-  { ay: "Sub", ciro: 38000, net: 24500, gider: 13500 },
-  { ay: "Mar", ciro: 48000, net: 32000, gider: 16000 },
-  { ay: "Nis", ciro: 52000, net: 35000, gider: 17000 },
-  { ay: "May", ciro: 58000, net: 39000, gider: 19000 },
-  { ay: "Haz", ciro: 62000, net: 42000, gider: 20000 },
-  { ay: "Tem", ciro: 68000, net: 46000, gider: 22000 },
-  { ay: "Agu", ciro: 65000, net: 44000, gider: 21000 },
-  { ay: "Eyl", ciro: 60000, net: 40000, gider: 20000 },
-  { ay: "Eki", ciro: 56000, net: 37000, gider: 19000 },
-  { ay: "Kas", ciro: 54000, net: 36000, gider: 18000 },
-  { ay: "Ara", ciro: 62000, net: 42000, gider: 20000 },
-]
+// Ciro ve net kazanc verisi
+const generateRevenueData = (date: Date, period: Period) => {
+  if (period === "daily") {
+    // Son 7 gun
+    const result = []
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(date)
+      d.setDate(d.getDate() - i)
+      const seed = d.getDate() + d.getMonth() * 31
+      const ciro = 1500 + (seed * 47 % 2000)
+      const gider = 400 + (seed * 13 % 500)
+      result.push({
+        label: `${d.getDate()} ${DAYS_SHORT[d.getDay()]}`,
+        ciro,
+        net: ciro - gider,
+        gider,
+      })
+    }
+    return result
+  } else if (period === "monthly") {
+    // 12 ay
+    return MONTHS_SHORT.map((ay, idx) => {
+      const seed = idx + date.getFullYear()
+      const ciro = 38000 + (seed * 1237 % 30000)
+      const gider = 12000 + (seed * 431 % 10000)
+      return {
+        label: ay,
+        ciro,
+        net: ciro - gider,
+        gider,
+      }
+    })
+  } else {
+    // Son 5 yil
+    const result = []
+    for (let i = 4; i >= 0; i--) {
+      const year = date.getFullYear() - i
+      const seed = year
+      const ciro = 450000 + (seed * 12347 % 250000)
+      const gider = 150000 + (seed * 4321 % 100000)
+      result.push({
+        label: year.toString(),
+        ciro,
+        net: ciro - gider,
+        gider,
+      })
+    }
+    return result
+  }
+}
 
-// Musteri memnuniyeti ve geri donus orani
-const customerSatisfactionData = [
-  { ay: "Oca", memnuniyet: 4.2, geriDonus: 65 },
-  { ay: "Sub", memnuniyet: 4.3, geriDonus: 68 },
-  { ay: "Mar", memnuniyet: 4.1, geriDonus: 62 },
-  { ay: "Nis", memnuniyet: 4.5, geriDonus: 72 },
-  { ay: "May", memnuniyet: 4.6, geriDonus: 75 },
-  { ay: "Haz", memnuniyet: 4.4, geriDonus: 70 },
-  { ay: "Tem", memnuniyet: 4.7, geriDonus: 78 },
-  { ay: "Agu", memnuniyet: 4.5, geriDonus: 74 },
-  { ay: "Eyl", memnuniyet: 4.4, geriDonus: 71 },
-  { ay: "Eki", memnuniyet: 4.3, geriDonus: 69 },
-  { ay: "Kas", memnuniyet: 4.2, geriDonus: 66 },
-  { ay: "Ara", memnuniyet: 4.6, geriDonus: 76 },
-]
+// Musteri memnuniyeti verisi
+const generateSatisfactionData = (year: number) => {
+  return MONTHS_SHORT.map((ay, idx) => {
+    const seed = idx + year
+    return {
+      ay,
+      memnuniyet: 4 + (seed % 10) / 10,
+      geriDonus: 60 + (seed * 3 % 25),
+    }
+  })
+}
 
-// Yogun saatler
-const peakHoursData = [
-  { saat: "09:00", musteri: 4 },
-  { saat: "10:00", musteri: 8 },
-  { saat: "11:00", musteri: 12 },
-  { saat: "12:00", musteri: 10 },
-  { saat: "13:00", musteri: 6 },
-  { saat: "14:00", musteri: 14 },
-  { saat: "15:00", musteri: 18 },
-  { saat: "16:00", musteri: 22 },
-  { saat: "17:00", musteri: 20 },
-  { saat: "18:00", musteri: 16 },
-  { saat: "19:00", musteri: 10 },
-  { saat: "20:00", musteri: 5 },
-]
+// Yogun saatler verisi (gune gore)
+const generatePeakHoursDaily = (date: Date) => {
+  const seed = date.getDate() + date.getMonth() * 31
+  const hours = ["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00", "20:00"]
+  return hours.map((saat, idx) => ({
+    saat,
+    musteri: 3 + ((seed + idx * 7) % 20),
+  }))
+}
+
+// Yogun gunler verisi (aya gore)
+const generatePeakDaysMonthly = (date: Date) => {
+  const seed = date.getMonth() + date.getFullYear()
+  return DAYS_SHORT.map((gun, idx) => ({
+    gun,
+    musteri: 20 + ((seed + idx * 17) % 60),
+  }))
+}
+
+// Tarih formatla
+const formatDate = (date: Date) => {
+  return `${date.getDate()} ${MONTHS[date.getMonth()]} ${date.getFullYear()}`
+}
+
+const formatMonth = (date: Date) => {
+  return `${MONTHS[date.getMonth()]} ${date.getFullYear()}`
+}
 
 // Donem secimi butonu
 function PeriodSelector({ 
   value, 
-  onChange 
+  onChange,
+  options = [
+    { id: "daily", label: "Gunluk" },
+    { id: "monthly", label: "Aylik" },
+    { id: "yearly", label: "Yillik" },
+  ]
 }: { 
-  value: Period
-  onChange: (period: Period) => void 
+  value: string
+  onChange: (period: string) => void
+  options?: { id: string; label: string }[]
 }) {
   return (
     <div className="flex gap-1 bg-muted p-1 rounded-lg">
-      {[
-        { id: "daily", label: "Gunluk" },
-        { id: "monthly", label: "Aylik" },
-        { id: "yearly", label: "Yillik" },
-      ].map((period) => (
+      {options.map((option) => (
         <button
-          key={period.id}
-          onClick={() => onChange(period.id as Period)}
+          key={option.id}
+          onClick={() => onChange(option.id)}
           className={cn(
             "px-3 py-1.5 text-xs font-medium rounded-md transition-all",
-            value === period.id
+            value === option.id
               ? "bg-background text-foreground shadow-sm"
               : "text-muted-foreground hover:text-foreground"
           )}
         >
-          {period.label}
+          {option.label}
         </button>
       ))}
+    </div>
+  )
+}
+
+// Tarih secici
+function DateNavigator({
+  date,
+  onPrev,
+  onNext,
+  label,
+}: {
+  date: Date
+  onPrev: () => void
+  onNext: () => void
+  label: string
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      <button
+        onClick={onPrev}
+        className="p-1.5 rounded-lg bg-muted hover:bg-muted/80 transition-colors"
+      >
+        <ChevronLeft className="w-4 h-4" />
+      </button>
+      <span className="text-sm font-medium min-w-[140px] text-center">{label}</span>
+      <button
+        onClick={onNext}
+        className="p-1.5 rounded-lg bg-muted hover:bg-muted/80 transition-colors"
+      >
+        <ChevronRight className="w-4 h-4" />
+      </button>
     </div>
   )
 }
@@ -246,35 +339,73 @@ function StatCard({
 }
 
 export function PerformanceView() {
+  // State for each chart
   const [employeePeriod, setEmployeePeriod] = useState<Period>("daily")
+  const [employeeDate, setEmployeeDate] = useState(new Date())
+  
+  const [durationDate, setDurationDate] = useState(new Date())
+  const [durationPeriod, setDurationPeriod] = useState<Period>("daily")
+  
   const [operationsPeriod, setOperationsPeriod] = useState<Period>("daily")
+  const [operationsDate, setOperationsDate] = useState(new Date())
+  
+  const [servicePeriod, setServicePeriod] = useState<Period>("daily")
+  const [serviceDate, setServiceDate] = useState(new Date())
+  
+  const [revenuePeriod, setRevenuePeriod] = useState<Period>("monthly")
+  const [revenueDate, setRevenueDate] = useState(new Date())
+  
+  const [satisfactionYear, setSatisfactionYear] = useState(new Date().getFullYear())
+  const [satisfactionPeriod, setSatisfactionPeriod] = useState<"monthly" | "yearly">("monthly")
+  
+  const [peakPeriod, setPeakPeriod] = useState<"daily" | "monthly">("daily")
+  const [peakDate, setPeakDate] = useState(new Date())
 
-  const getEmployeeData = () => {
-    switch (employeePeriod) {
-      case "daily":
-        return employeePerformanceDaily
-      case "monthly":
-        return employeePerformanceMonthly
-      case "yearly":
-        return employeePerformanceYearly
+  // Navigation helpers
+  const navigateDate = (date: Date, setDate: (d: Date) => void, period: Period, direction: number) => {
+    const newDate = new Date(date)
+    if (period === "daily") {
+      newDate.setDate(newDate.getDate() + direction)
+    } else if (period === "monthly") {
+      newDate.setMonth(newDate.getMonth() + direction)
+    } else {
+      newDate.setFullYear(newDate.getFullYear() + direction)
     }
+    setDate(newDate)
   }
 
+  const getDateLabel = (date: Date, period: Period) => {
+    if (period === "daily") return formatDate(date)
+    if (period === "monthly") return formatMonth(date)
+    return date.getFullYear().toString()
+  }
+
+  // Get data based on current selections
+  const employeeData = generateEmployeeData(employeeDate, employeePeriod)
+  const durationData = generateDurationData(durationDate)
+  
   const getOperationsData = () => {
-    switch (operationsPeriod) {
-      case "daily":
-        return { data: dailyOperationsData, xKey: "gun" }
-      case "monthly":
-        return { data: monthlyOperationsData, xKey: "ay" }
-      case "yearly":
-        return { data: yearlyOperationsData, xKey: "yil" }
+    if (operationsPeriod === "daily") {
+      return { data: generateDailyOperations(operationsDate), xKey: "gun" }
+    } else if (operationsPeriod === "monthly") {
+      return { data: generateMonthlyOperations(operationsDate.getFullYear()), xKey: "ay" }
+    } else {
+      return { data: generateYearlyOperations(operationsDate.getFullYear()), xKey: "yil" }
     }
   }
 
+  const serviceData = generateRevenueByService(serviceDate, servicePeriod)
+  const revenueData = generateRevenueData(revenueDate, revenuePeriod)
+  const satisfactionData = generateSatisfactionData(satisfactionYear)
+  const peakData = peakPeriod === "daily" 
+    ? generatePeakHoursDaily(peakDate) 
+    : generatePeakDaysMonthly(peakDate)
+
+  // Summary calculations
   const totalRevenue = revenueData.reduce((sum, item) => sum + item.ciro, 0)
   const totalNet = revenueData.reduce((sum, item) => sum + item.net, 0)
-  const totalOperations = monthlyOperationsData.reduce((sum, item) => sum + item.islem, 0)
-  const avgSatisfaction = (customerSatisfactionData.reduce((sum, item) => sum + item.memnuniyet, 0) / customerSatisfactionData.length).toFixed(1)
+  const totalOperations = employeeData.reduce((sum, item) => sum + item.islem, 0)
+  const avgSatisfaction = (satisfactionData.reduce((sum, item) => sum + item.memnuniyet, 0) / satisfactionData.length).toFixed(1)
 
   return (
     <div className="p-6 space-y-6">
@@ -287,14 +418,14 @@ export function PerformanceView() {
       {/* Ozet Kartlar */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
-          title="Toplam Ciro (Yil)"
+          title="Toplam Ciro"
           value={`${(totalRevenue / 1000).toFixed(0)}K TL`}
           change="+12.5%"
           icon={DollarSign}
           color="primary"
         />
         <StatCard
-          title="Net Kazanc (Yil)"
+          title="Net Kazanc"
           value={`${(totalNet / 1000).toFixed(0)}K TL`}
           change="+8.2%"
           icon={TrendingUp}
@@ -320,12 +451,24 @@ export function PerformanceView() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Calisan Performansi */}
         <Card className="rounded-2xl border-border/50">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <div>
-              <CardTitle className="text-base font-semibold">Calisan Islem Sayisi</CardTitle>
-              <CardDescription>Calisanlarin yaptigi islem sayilari</CardDescription>
+          <CardHeader className="pb-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <CardTitle className="text-base font-semibold">Calisan Islem Sayisi</CardTitle>
+                <CardDescription>Calisanlarin yaptigi islem sayilari</CardDescription>
+              </div>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                <PeriodSelector value={employeePeriod} onChange={(p) => setEmployeePeriod(p as Period)} />
+              </div>
             </div>
-            <PeriodSelector value={employeePeriod} onChange={setEmployeePeriod} />
+            <div className="mt-2">
+              <DateNavigator
+                date={employeeDate}
+                onPrev={() => navigateDate(employeeDate, setEmployeeDate, employeePeriod, -1)}
+                onNext={() => navigateDate(employeeDate, setEmployeeDate, employeePeriod, 1)}
+                label={getDateLabel(employeeDate, employeePeriod)}
+              />
+            </div>
           </CardHeader>
           <CardContent>
             <ChartContainer
@@ -335,13 +478,13 @@ export function PerformanceView() {
               className="h-[280px]"
             >
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={getEmployeeData()} layout="vertical" margin={{ left: 20, right: 20 }}>
+                <BarChart data={employeeData} layout="vertical" margin={{ left: 20, right: 20 }}>
                   <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
                   <XAxis type="number" tick={{ fontSize: 12 }} />
                   <YAxis dataKey="name" type="category" tick={{ fontSize: 12 }} width={70} />
                   <ChartTooltip content={<ChartTooltipContent />} />
                   <Bar dataKey="islem" radius={[0, 6, 6, 0]}>
-                    {getEmployeeData().map((entry, index) => (
+                    {employeeData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.renk} />
                     ))}
                   </Bar>
@@ -353,9 +496,25 @@ export function PerformanceView() {
 
         {/* Ortalama Islem Sureleri */}
         <Card className="rounded-2xl border-border/50">
-          <CardHeader>
-            <CardTitle className="text-base font-semibold">Ortalama Islem Sureleri</CardTitle>
-            <CardDescription>Calisanlarin ortalama islem sureleri (dakika)</CardDescription>
+          <CardHeader className="pb-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <CardTitle className="text-base font-semibold">Ortalama Islem Sureleri</CardTitle>
+                <CardDescription>Calisanlarin ortalama islem sureleri (dakika)</CardDescription>
+              </div>
+              <PeriodSelector 
+                value={durationPeriod} 
+                onChange={(p) => setDurationPeriod(p as Period)} 
+              />
+            </div>
+            <div className="mt-2">
+              <DateNavigator
+                date={durationDate}
+                onPrev={() => navigateDate(durationDate, setDurationDate, durationPeriod, -1)}
+                onNext={() => navigateDate(durationDate, setDurationDate, durationPeriod, 1)}
+                label={getDateLabel(durationDate, durationPeriod)}
+              />
+            </div>
           </CardHeader>
           <CardContent>
             <ChartContainer
@@ -366,7 +525,7 @@ export function PerformanceView() {
               className="h-[280px]"
             >
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={avgDurationData} margin={{ left: 0, right: 20 }}>
+                <BarChart data={durationData} margin={{ left: 0, right: 20 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
                   <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                   <YAxis tick={{ fontSize: 12 }} />
@@ -382,12 +541,22 @@ export function PerformanceView() {
 
         {/* Islem Grafigi */}
         <Card className="rounded-2xl border-border/50">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <div>
-              <CardTitle className="text-base font-semibold">Islem Grafigi</CardTitle>
-              <CardDescription>Yapilan islem ve musteri sayilari</CardDescription>
+          <CardHeader className="pb-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <CardTitle className="text-base font-semibold">Islem Grafigi</CardTitle>
+                <CardDescription>Yapilan islem ve musteri sayilari</CardDescription>
+              </div>
+              <PeriodSelector value={operationsPeriod} onChange={(p) => setOperationsPeriod(p as Period)} />
             </div>
-            <PeriodSelector value={operationsPeriod} onChange={setOperationsPeriod} />
+            <div className="mt-2">
+              <DateNavigator
+                date={operationsDate}
+                onPrev={() => navigateDate(operationsDate, setOperationsDate, operationsPeriod, -1)}
+                onNext={() => navigateDate(operationsDate, setOperationsDate, operationsPeriod, 1)}
+                label={getDateLabel(operationsDate, operationsPeriod)}
+              />
+            </div>
           </CardHeader>
           <CardContent>
             <ChartContainer
@@ -438,30 +607,43 @@ export function PerformanceView() {
 
         {/* En Cok Kazandiran Islemler */}
         <Card className="rounded-2xl border-border/50">
-          <CardHeader>
-            <CardTitle className="text-base font-semibold">En Cok Kazandiran Islemler</CardTitle>
-            <CardDescription>Hizmetlere gore gelir dagilimi</CardDescription>
+          <CardHeader className="pb-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <CardTitle className="text-base font-semibold">En Cok Kazandiran Islemler</CardTitle>
+                <CardDescription>Hizmetlere gore gelir dagilimi</CardDescription>
+              </div>
+              <PeriodSelector value={servicePeriod} onChange={(p) => setServicePeriod(p as Period)} />
+            </div>
+            <div className="mt-2">
+              <DateNavigator
+                date={serviceDate}
+                onPrev={() => navigateDate(serviceDate, setServiceDate, servicePeriod, -1)}
+                onNext={() => navigateDate(serviceDate, setServiceDate, servicePeriod, 1)}
+                label={getDateLabel(serviceDate, servicePeriod)}
+              />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="flex gap-4 h-[280px]">
+            <div className="flex gap-4 h-[260px]">
               <ChartContainer
                 config={{
                   kazanc: { label: "Kazanc", color: COLORS.primary },
                 }}
-                className="flex-1"
+                className="flex-1 min-w-0"
               >
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
-                      data={revenueByServiceData}
+                      data={serviceData}
                       cx="50%"
                       cy="50%"
-                      innerRadius={50}
-                      outerRadius={90}
+                      innerRadius={45}
+                      outerRadius={80}
                       paddingAngle={2}
                       dataKey="kazanc"
                     >
-                      {revenueByServiceData.map((entry, index) => (
+                      {serviceData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.renk} />
                       ))}
                     </Pie>
@@ -483,14 +665,14 @@ export function PerformanceView() {
                   </PieChart>
                 </ResponsiveContainer>
               </ChartContainer>
-              <div className="w-32 flex flex-col justify-center gap-1.5">
-                {revenueByServiceData.slice(0, 5).map((item) => (
-                  <div key={item.name} className="flex items-center gap-2">
+              <div className="w-28 flex flex-col justify-center gap-1 shrink-0 overflow-hidden">
+                {serviceData.slice(0, 5).map((item) => (
+                  <div key={item.name} className="flex items-center gap-1.5">
                     <div 
-                      className="w-2.5 h-2.5 rounded-full shrink-0" 
+                      className="w-2 h-2 rounded-full shrink-0" 
                       style={{ backgroundColor: item.renk }} 
                     />
-                    <span className="text-xs text-muted-foreground truncate">{item.name}</span>
+                    <span className="text-[10px] text-muted-foreground truncate">{item.name}</span>
                   </div>
                 ))}
               </div>
@@ -500,9 +682,24 @@ export function PerformanceView() {
 
         {/* Ciro ve Net Kazanc */}
         <Card className="rounded-2xl border-border/50 lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="text-base font-semibold">Ciro ve Net Kazanc</CardTitle>
-            <CardDescription>Aylik ciro, gider ve net kazanc grafigi</CardDescription>
+          <CardHeader className="pb-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <CardTitle className="text-base font-semibold">Ciro ve Net Kazanc</CardTitle>
+                <CardDescription>Ciro, gider ve net kazanc grafigi</CardDescription>
+              </div>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                <PeriodSelector value={revenuePeriod} onChange={(p) => setRevenuePeriod(p as Period)} />
+              </div>
+            </div>
+            <div className="mt-2">
+              <DateNavigator
+                date={revenueDate}
+                onPrev={() => navigateDate(revenueDate, setRevenueDate, revenuePeriod, -1)}
+                onNext={() => navigateDate(revenueDate, setRevenueDate, revenuePeriod, 1)}
+                label={getDateLabel(revenueDate, revenuePeriod)}
+              />
+            </div>
           </CardHeader>
           <CardContent>
             <ChartContainer
@@ -516,7 +713,7 @@ export function PerformanceView() {
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={revenueData} margin={{ left: 0, right: 20 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="ay" tick={{ fontSize: 12 }} />
+                  <XAxis dataKey="label" tick={{ fontSize: 12 }} />
                   <YAxis tick={{ fontSize: 12 }} tickFormatter={(value) => `${value / 1000}K`} />
                   <ChartTooltip 
                     content={({ active, payload, label }) => {
@@ -552,9 +749,29 @@ export function PerformanceView() {
 
         {/* Musteri Memnuniyeti ve Geri Donus */}
         <Card className="rounded-2xl border-border/50">
-          <CardHeader>
-            <CardTitle className="text-base font-semibold">Musteri Memnuniyeti</CardTitle>
-            <CardDescription>Memnuniyet puani ve geri donus orani</CardDescription>
+          <CardHeader className="pb-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <CardTitle className="text-base font-semibold">Musteri Memnuniyeti</CardTitle>
+                <CardDescription>Memnuniyet puani ve geri donus orani</CardDescription>
+              </div>
+              <PeriodSelector 
+                value={satisfactionPeriod} 
+                onChange={(p) => setSatisfactionPeriod(p as "monthly" | "yearly")}
+                options={[
+                  { id: "monthly", label: "Aylik" },
+                  { id: "yearly", label: "Yillik" },
+                ]}
+              />
+            </div>
+            <div className="mt-2">
+              <DateNavigator
+                date={new Date(satisfactionYear, 0, 1)}
+                onPrev={() => setSatisfactionYear(satisfactionYear - 1)}
+                onNext={() => setSatisfactionYear(satisfactionYear + 1)}
+                label={satisfactionYear.toString()}
+              />
+            </div>
           </CardHeader>
           <CardContent>
             <ChartContainer
@@ -565,7 +782,7 @@ export function PerformanceView() {
               className="h-[280px]"
             >
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={customerSatisfactionData} margin={{ left: 0, right: 20 }}>
+                <LineChart data={satisfactionData} margin={{ left: 0, right: 20 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
                   <XAxis dataKey="ay" tick={{ fontSize: 12 }} />
                   <YAxis yAxisId="left" tick={{ fontSize: 12 }} domain={[3, 5]} />
@@ -596,11 +813,53 @@ export function PerformanceView() {
           </CardContent>
         </Card>
 
-        {/* Yogun Saatler */}
+        {/* Yogun Saatler / Gunler */}
         <Card className="rounded-2xl border-border/50">
-          <CardHeader>
-            <CardTitle className="text-base font-semibold">Yogun Saatler</CardTitle>
-            <CardDescription>Saatlere gore ortalama musteri yogunlugu</CardDescription>
+          <CardHeader className="pb-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <CardTitle className="text-base font-semibold">
+                  {peakPeriod === "daily" ? "Yogun Saatler" : "Yogun Gunler"}
+                </CardTitle>
+                <CardDescription>
+                  {peakPeriod === "daily" 
+                    ? "Saatlere gore musteri yogunlugu" 
+                    : "Gunlere gore musteri yogunlugu"}
+                </CardDescription>
+              </div>
+              <PeriodSelector 
+                value={peakPeriod} 
+                onChange={(p) => setPeakPeriod(p as "daily" | "monthly")}
+                options={[
+                  { id: "daily", label: "Saatlik" },
+                  { id: "monthly", label: "Gunluk" },
+                ]}
+              />
+            </div>
+            <div className="mt-2">
+              <DateNavigator
+                date={peakDate}
+                onPrev={() => {
+                  const newDate = new Date(peakDate)
+                  if (peakPeriod === "daily") {
+                    newDate.setDate(newDate.getDate() - 1)
+                  } else {
+                    newDate.setMonth(newDate.getMonth() - 1)
+                  }
+                  setPeakDate(newDate)
+                }}
+                onNext={() => {
+                  const newDate = new Date(peakDate)
+                  if (peakPeriod === "daily") {
+                    newDate.setDate(newDate.getDate() + 1)
+                  } else {
+                    newDate.setMonth(newDate.getMonth() + 1)
+                  }
+                  setPeakDate(newDate)
+                }}
+                label={peakPeriod === "daily" ? formatDate(peakDate) : formatMonth(peakDate)}
+              />
+            </div>
           </CardHeader>
           <CardContent>
             <ChartContainer
@@ -610,7 +869,7 @@ export function PerformanceView() {
               className="h-[280px]"
             >
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={peakHoursData} margin={{ left: 0, right: 20 }}>
+                <AreaChart data={peakData} margin={{ left: 0, right: 20 }}>
                   <defs>
                     <linearGradient id="peakGradient" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor={COLORS.tertiary} stopOpacity={0.4} />
@@ -618,7 +877,7 @@ export function PerformanceView() {
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="saat" tick={{ fontSize: 11 }} />
+                  <XAxis dataKey={peakPeriod === "daily" ? "saat" : "gun"} tick={{ fontSize: 11 }} />
                   <YAxis tick={{ fontSize: 12 }} />
                   <ChartTooltip content={<ChartTooltipContent />} />
                   <Area
