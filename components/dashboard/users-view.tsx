@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -42,6 +42,21 @@ interface EmployeeData {
   status: "aktif" | "pasif"
   experience: string
   notes: string
+}
+
+interface PersonelApiRow {
+  id?: string | number
+  full_name?: string
+  first_name?: string
+  last_name?: string
+  phone?: string
+  expertise?: string
+  work_start_time?: string
+  work_end_time?: string
+  hire_date?: string
+  is_active?: boolean | number | string
+  role?: string
+  notes?: string
 }
 
 const specialtyOptions = [
@@ -128,8 +143,38 @@ const statusConfig = {
   },
 }
 
+function toEmployeeData(row: PersonelApiRow, index: number): EmployeeData {
+  const fullName = String(row.full_name ?? "").trim()
+  const firstName = String(row.first_name ?? "").trim()
+  const lastName = String(row.last_name ?? "").trim()
+  const name = fullName || `${firstName} ${lastName}`.trim() || `Calisan ${index + 1}`
+  const specialty = String(row.expertise ?? "")
+    .split("|")
+    .map((item) => item.trim())
+    .filter(Boolean)
+  const start = String(row.work_start_time ?? "").trim()
+  const end = String(row.work_end_time ?? "").trim()
+  const workingHours = start && end ? `${start} - ${end}` : ""
+  const isActiveValue = row.is_active
+  const isActive = isActiveValue === true || isActiveValue === 1 || isActiveValue === "1" || isActiveValue === "true"
+
+  return {
+    id: String(row.id ?? `EMP${String(index + 1).padStart(3, "0")}`),
+    name,
+    phone: String(row.phone ?? ""),
+    specialty,
+    workingHours,
+    startDate: String(row.hire_date ?? "").slice(0, 10),
+    status: isActive ? "aktif" : "pasif",
+    experience: String(row.role ?? ""),
+    notes: String(row.notes ?? ""),
+  }
+}
+
 export function UsersView() {
   const [employees, setEmployees] = useState<EmployeeData[]>(initialEmployees)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSaving, setIsSaving] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [filterStatus, setFilterStatus] = useState<string>("all")
   const [filterSpecialty, setFilterSpecialty] = useState<string>("all")
@@ -148,6 +193,27 @@ export function UsersView() {
     notes: "",
   })
 
+  useEffect(() => {
+    const loadEmployees = async () => {
+      try {
+        setIsLoading(true)
+        const res = await fetch("/api/personels", { cache: "no-store" })
+        const data = await res.json().catch(() => null)
+        if (!res.ok || !data?.ok || !Array.isArray(data?.rows)) {
+          return
+        }
+        const mapped = data.rows.map((row: PersonelApiRow, index: number) => toEmployeeData(row, index))
+        setEmployees(mapped)
+      } catch {
+        // UI fallback: keep existing local list if API fails.
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    void loadEmployees()
+  }, [])
+
   const filteredEmployees = employees.filter((employee) => {
     const matchesSearch =
       employee.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -163,19 +229,43 @@ export function UsersView() {
     passive: employees.filter((e) => e.status === "pasif").length,
   }
 
-  const handleAddEmployee = () => {
+  const handleAddEmployee = async () => {
     if (!formData.name || !formData.phone) {
       alert("Lutfen zorunlu alanlari doldurun.")
       return
     }
-    const newEmployee: EmployeeData = {
-      id: `EMP${String(employees.length + 1).padStart(3, "0")}`,
-      ...formData,
-      startDate: formData.startDate || new Date().toISOString().split("T")[0],
+
+    try {
+      setIsSaving(true)
+      const payload = {
+        ...formData,
+        startDate: formData.startDate || new Date().toISOString().split("T")[0],
+      }
+      const res = await fetch("/api/personels", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok || !data?.ok) {
+        alert(data?.message ?? "Calisan eklenemedi.")
+        return
+      }
+
+      const listRes = await fetch("/api/personels", { cache: "no-store" })
+      const listData = await listRes.json().catch(() => null)
+      if (listRes.ok && listData?.ok && Array.isArray(listData?.rows)) {
+        const mapped = listData.rows.map((row: PersonelApiRow, index: number) => toEmployeeData(row, index))
+        setEmployees(mapped)
+      }
+
+      resetForm()
+      setShowAddModal(false)
+    } catch {
+      alert("Calisan eklenirken bir hata olustu.")
+    } finally {
+      setIsSaving(false)
     }
-    setEmployees([...employees, newEmployee])
-    resetForm()
-    setShowAddModal(false)
   }
 
   const handleEditEmployee = () => {
@@ -445,7 +535,13 @@ export function UsersView() {
         })}
       </div>
 
-      {filteredEmployees.length === 0 && (
+      {isLoading && (
+        <div className="text-center py-12">
+          <p className="text-muted-foreground">Calisanlar yukleniyor...</p>
+        </div>
+      )}
+
+      {!isLoading && filteredEmployees.length === 0 && (
         <div className="text-center py-12">
           <Users className="w-12 h-12 mx-auto text-muted-foreground/50" />
           <p className="mt-4 text-muted-foreground">Calisan bulunamadi</p>
@@ -619,9 +715,10 @@ export function UsersView() {
               <Button
                 className="rounded-xl h-11 px-6 gap-2 shadow-lg shadow-primary/25"
                 onClick={editingEmployee ? handleEditEmployee : handleAddEmployee}
+                disabled={isSaving}
               >
                 <Save className="w-4 h-4" />
-                {editingEmployee ? "Guncelle" : "Calisan Ekle"}
+                {editingEmployee ? "Guncelle" : isSaving ? "Ekleniyor..." : "Calisan Ekle"}
               </Button>
             </div>
           </div>
