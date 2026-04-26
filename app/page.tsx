@@ -15,6 +15,7 @@ import { ReservationsView } from "@/components/dashboard/reservations-view"
 import { PerformanceView } from "@/components/dashboard/performance-view"
 import { ReviewsView } from "@/components/dashboard/reviews-view"
 import { MyReservationsView } from "@/components/dashboard/my-reservations-view"
+import { SettingsView } from "@/components/dashboard/settings-view"
 import { loginWithApi } from "@/lib/services/auth-service"
 
 type AuthState = "login" | "register" | "authenticated"
@@ -114,12 +115,7 @@ export default function Dashboard() {
       case "inventory":
         return <InventoryView />
       case "settings":
-        return (
-          <div className="p-6">
-            <h1 className="text-2xl font-semibold text-foreground">Ayarlar</h1>
-            <p className="text-muted-foreground mt-2">Ayarlar sayfasi yakinda gelecek.</p>
-          </div>
-        )
+        return <SettingsView user={user ? { email: user.email, restaurantName: user.restaurantName, role: user.role } : undefined} />
       case "users":
         return <UsersView />
       case "reservations":
