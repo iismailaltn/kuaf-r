@@ -14,6 +14,7 @@ import {
   Users,
   CalendarCheck2,
   BarChart3,
+  Star,
 } from "lucide-react"
 import { useState } from "react"
 
@@ -28,6 +29,7 @@ export type ViewType =
   | "reservations"
   | "performance"
   | "customers"
+  | "reviews"
   | "settings"
 
 interface SidebarProps {
@@ -44,6 +46,7 @@ const navItemsByRole: Record<UserRole, Array<{ id: ViewType; icon: any; label: s
     { id: "orders", icon: ShoppingCart, label: "Siparisler" },
     { id: "tables", icon: UtensilsCrossed, label: "Çalısma Alanları" },
     { id: "products", icon: Package, label: "Urunler" },
+    { id: "reviews", icon: Star, label: "Yorumlar" },
     { id: "users", icon: Users, label: "Kullanicilar" },
     { id: "reservations", icon: CalendarCheck2, label: "Rezervasyonlar" },
     { id: "performance", icon: BarChart3, label: "Performans" },
