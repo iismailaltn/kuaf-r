@@ -27,6 +27,7 @@ export type ViewType =
   | "inventory"
   | "users"
   | "reservations"
+  | "my-reservations"
   | "performance"
   | "customers"
   | "reviews"
@@ -60,7 +61,7 @@ const navItemsByRole: Record<UserRole, Array<{ id: ViewType; icon: any; label: s
   ],
   user: [
     { id: "dashboard", icon: LayoutDashboard, label: "Panel" },
-    { id: "orders", icon: ShoppingCart, label: "Siparisler" },
+    { id: "my-reservations", icon: CalendarCheck2, label: "Randevularim" },
     { id: "tables", icon: UtensilsCrossed, label: "Calisma Alanlari" },
     { id: "products", icon: Package, label: "Urunler" },
     { id: "settings", icon: Settings, label: "Ayarlar" },

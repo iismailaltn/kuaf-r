@@ -14,6 +14,7 @@ import { UsersView } from "@/components/dashboard/users-view"
 import { ReservationsView } from "@/components/dashboard/reservations-view"
 import { PerformanceView } from "@/components/dashboard/performance-view"
 import { ReviewsView } from "@/components/dashboard/reviews-view"
+import { MyReservationsView } from "@/components/dashboard/my-reservations-view"
 import { loginWithApi } from "@/lib/services/auth-service"
 
 type AuthState = "login" | "register" | "authenticated"
@@ -127,6 +128,8 @@ export default function Dashboard() {
         return <PerformanceView />
       case "reviews":
         return <ReviewsView />
+      case "my-reservations":
+        return <MyReservationsView staffName={user?.restaurantName} />
       case "customers":
         return (
           <div className="p-6">
