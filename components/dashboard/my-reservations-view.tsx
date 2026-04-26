@@ -8,7 +8,6 @@ import { cn } from "@/lib/utils"
 import {
   Calendar,
   Clock,
-  User,
   Phone,
   Scissors,
   FileText,
@@ -75,7 +74,7 @@ const initialReservations: Reservation[] = [
   },
   {
     id: "RES003",
-    date: "2026-04-26",
+    date: "2026-04-28",
     time: "14:00",
     customerName: "Hasan",
     customerSurname: "Celik",
@@ -89,7 +88,7 @@ const initialReservations: Reservation[] = [
   },
   {
     id: "RES004",
-    date: "2026-04-27",
+    date: "2026-04-30",
     time: "11:00",
     customerName: "Yusuf",
     customerSurname: "Ozturk",
@@ -103,7 +102,7 @@ const initialReservations: Reservation[] = [
   },
   {
     id: "RES005",
-    date: "2026-04-28",
+    date: "2026-05-02",
     time: "15:30",
     customerName: "Emre",
     customerSurname: "Aydin",
@@ -117,7 +116,7 @@ const initialReservations: Reservation[] = [
   },
   {
     id: "RES006",
-    date: "2026-04-25",
+    date: "2026-05-05",
     time: "10:00",
     customerName: "Kemal",
     customerSurname: "Yildiz",
@@ -127,7 +126,35 @@ const initialReservations: Reservation[] = [
     staffName: "Ahmet Yilmaz",
     notes: "",
     source: "manual",
-    status: "completed",
+    status: "confirmed",
+  },
+  {
+    id: "RES007",
+    date: "2026-05-10",
+    time: "09:30",
+    customerName: "Burak",
+    customerSurname: "Sahin",
+    phone: "0538 222 33 44",
+    services: ["Sac Kesimi", "Sakal Kesimi"],
+    staffId: "EMP001",
+    staffName: "Ahmet Yilmaz",
+    notes: "Her ay gelir",
+    source: "website",
+    status: "confirmed",
+  },
+  {
+    id: "RES008",
+    date: "2026-05-15",
+    time: "16:00",
+    customerName: "Okan",
+    customerSurname: "Koc",
+    phone: "0539 333 44 55",
+    services: ["Sac Kesimi"],
+    staffId: "EMP001",
+    staffName: "Ahmet Yilmaz",
+    notes: "",
+    source: "manual",
+    status: "pending",
   },
 ]
 
@@ -136,27 +163,32 @@ const turkishMonths = [
   "Temmuz", "Agustos", "Eylul", "Ekim", "Kasim", "Aralik"
 ]
 
+const turkishDaysShort = ["Pzt", "Sal", "Car", "Per", "Cum", "Cmt", "Paz"]
 const turkishDays = ["Pazar", "Pazartesi", "Sali", "Carsamba", "Persembe", "Cuma", "Cumartesi"]
 
 const statusConfig = {
   pending: {
     label: "Beklemede",
     color: "bg-amber-500/10 text-amber-600 border-amber-200",
+    dotColor: "bg-amber-500",
     icon: AlertCircle,
   },
   confirmed: {
     label: "Onaylandi",
     color: "bg-blue-500/10 text-blue-600 border-blue-200",
+    dotColor: "bg-blue-500",
     icon: CheckCircle2,
   },
   completed: {
     label: "Tamamlandi",
     color: "bg-emerald-500/10 text-emerald-600 border-emerald-200",
+    dotColor: "bg-emerald-500",
     icon: CheckCircle2,
   },
   cancelled: {
     label: "Iptal",
     color: "bg-red-500/10 text-red-600 border-red-200",
+    dotColor: "bg-red-500",
     icon: XCircle,
   },
 }
@@ -174,25 +206,102 @@ export function MyReservationsView({
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
   const [filterStatus, setFilterStatus] = useState<string>("all")
-
-  // Bugunden itibaren 7 gun
+  
+  // Ay navigasyonu
   const today = new Date()
-  const weekDays = useMemo(() => {
+  const [currentMonth, setCurrentMonth] = useState(today.getMonth())
+  const [currentYear, setCurrentYear] = useState(today.getFullYear())
+
+  // Onceki ay
+  const prevMonth = () => {
+    if (currentMonth === 0) {
+      setCurrentMonth(11)
+      setCurrentYear(currentYear - 1)
+    } else {
+      setCurrentMonth(currentMonth - 1)
+    }
+  }
+
+  // Sonraki ay
+  const nextMonth = () => {
+    if (currentMonth === 11) {
+      setCurrentMonth(0)
+      setCurrentYear(currentYear + 1)
+    } else {
+      setCurrentMonth(currentMonth + 1)
+    }
+  }
+
+  // Bugune don
+  const goToToday = () => {
+    setCurrentMonth(today.getMonth())
+    setCurrentYear(today.getFullYear())
+    setSelectedDate(null)
+  }
+
+  // Ayin gunlerini hesapla
+  const calendarDays = useMemo(() => {
+    const firstDayOfMonth = new Date(currentYear, currentMonth, 1)
+    const lastDayOfMonth = new Date(currentYear, currentMonth + 1, 0)
+    
+    // Pazartesi = 0, Pazar = 6 olacak sekilde ayarla
+    let startDay = firstDayOfMonth.getDay() - 1
+    if (startDay < 0) startDay = 6
+    
+    const daysInMonth = lastDayOfMonth.getDate()
     const days = []
-    for (let i = 0; i < 7; i++) {
-      const date = new Date(today)
-      date.setDate(today.getDate() + i)
+    
+    // Onceki ayin gunleri
+    const prevMonthLastDay = new Date(currentYear, currentMonth, 0).getDate()
+    for (let i = startDay - 1; i >= 0; i--) {
+      const day = prevMonthLastDay - i
+      const month = currentMonth === 0 ? 11 : currentMonth - 1
+      const year = currentMonth === 0 ? currentYear - 1 : currentYear
       days.push({
-        date: date,
-        dateStr: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`,
-        dayName: turkishDays[date.getDay()],
-        dayNumber: date.getDate(),
-        monthName: turkishMonths[date.getMonth()],
-        isToday: i === 0,
+        day,
+        month,
+        year,
+        dateStr: `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`,
+        isCurrentMonth: false,
+        isToday: false,
       })
     }
+    
+    // Bu ayin gunleri
+    for (let i = 1; i <= daysInMonth; i++) {
+      const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}-${String(i).padStart(2, "0")}`
+      const isToday = 
+        i === today.getDate() && 
+        currentMonth === today.getMonth() && 
+        currentYear === today.getFullYear()
+      
+      days.push({
+        day: i,
+        month: currentMonth,
+        year: currentYear,
+        dateStr,
+        isCurrentMonth: true,
+        isToday,
+      })
+    }
+    
+    // Sonraki ayin gunleri (6 satir tamamlamak icin)
+    const remainingDays = 42 - days.length
+    for (let i = 1; i <= remainingDays; i++) {
+      const month = currentMonth === 11 ? 0 : currentMonth + 1
+      const year = currentMonth === 11 ? currentYear + 1 : currentYear
+      days.push({
+        day: i,
+        month,
+        year,
+        dateStr: `${year}-${String(month + 1).padStart(2, "0")}-${String(i).padStart(2, "0")}`,
+        isCurrentMonth: false,
+        isToday: false,
+      })
+    }
+    
     return days
-  }, [])
+  }, [currentMonth, currentYear, today])
 
   // Kullanicinin rezervasyonlari
   const myReservations = useMemo(() => {
@@ -232,15 +341,22 @@ export function MyReservationsView({
     })
   }, [myReservations, selectedDate, searchQuery, filterStatus])
 
-  // Bir gundeki rezervasyon sayisi
-  const getReservationCount = (dateStr: string) => {
-    return myReservations.filter((r) => r.date === dateStr && r.status !== "cancelled" && r.status !== "completed").length
+  // Bir gundeki rezervasyonlar
+  const getReservationsForDate = (dateStr: string) => {
+    return myReservations.filter((r) => r.date === dateStr && r.status !== "cancelled")
   }
 
   // Bugunku randevu sayisi
-  const todayCount = getReservationCount(weekDays[0].dateStr)
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`
+  const todayCount = getReservationsForDate(todayStr).length
   const pendingCount = myReservations.filter((r) => r.status === "pending").length
   const confirmedCount = myReservations.filter((r) => r.status === "confirmed").length
+
+  // Bu aydaki toplam randevu
+  const monthReservations = myReservations.filter((r) => {
+    const [y, m] = r.date.split("-").map(Number)
+    return y === currentYear && m === currentMonth + 1 && r.status !== "cancelled"
+  })
 
   // Durum guncelle
   const updateStatus = (id: string, newStatus: Reservation["status"]) => {
@@ -269,7 +385,7 @@ export function MyReservationsView({
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <div className="p-5 bg-card rounded-2xl border border-border">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
@@ -278,6 +394,17 @@ export function MyReservationsView({
             <div>
               <p className="text-2xl font-bold text-foreground">{todayCount}</p>
               <p className="text-sm text-muted-foreground">Bugunki Randevu</p>
+            </div>
+          </div>
+        </div>
+        <div className="p-5 bg-card rounded-2xl border border-border">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-xl bg-purple-500/10 flex items-center justify-center">
+              <Calendar className="w-6 h-6 text-purple-600" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-foreground">{monthReservations.length}</p>
+              <p className="text-sm text-muted-foreground">Bu Ay Toplam</p>
             </div>
           </div>
         </div>
@@ -305,64 +432,161 @@ export function MyReservationsView({
         </div>
       </div>
 
-      {/* Haftalik Takvim */}
-      <div className="bg-card rounded-2xl border border-border p-4">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold text-foreground">Bu Hafta</h3>
-          {selectedDate && (
+      {/* Aylik Takvim */}
+      <div className="bg-card rounded-2xl border border-border p-5">
+        {/* Takvim Header */}
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-3">
+            <h3 className="text-lg font-semibold text-foreground">
+              {turkishMonths[currentMonth]} {currentYear}
+            </h3>
+            <Badge variant="outline" className="text-xs">
+              {monthReservations.length} randevu
+            </Badge>
+          </div>
+          <div className="flex items-center gap-2">
             <Button
-              variant="ghost"
+              variant="outline"
               size="sm"
-              className="text-muted-foreground"
-              onClick={() => setSelectedDate(null)}
+              className="rounded-lg"
+              onClick={goToToday}
             >
-              Filtreyi Temizle
+              Bugun
             </Button>
-          )}
+            <div className="flex items-center border border-border rounded-lg overflow-hidden">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="rounded-none h-8 w-8"
+                onClick={prevMonth}
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+              <div className="w-px h-4 bg-border" />
+              <Button
+                variant="ghost"
+                size="icon"
+                className="rounded-none h-8 w-8"
+                onClick={nextMonth}
+              >
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
+            {selectedDate && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-muted-foreground rounded-lg"
+                onClick={() => setSelectedDate(null)}
+              >
+                Filtreyi Temizle
+              </Button>
+            )}
+          </div>
         </div>
-        <div className="grid grid-cols-7 gap-2">
-          {weekDays.map((day) => {
-            const count = getReservationCount(day.dateStr)
+
+        {/* Gun Basliklari */}
+        <div className="grid grid-cols-7 gap-1 mb-2">
+          {turkishDaysShort.map((day) => (
+            <div
+              key={day}
+              className="text-center text-xs font-medium text-muted-foreground py-2"
+            >
+              {day}
+            </div>
+          ))}
+        </div>
+
+        {/* Takvim Gunleri */}
+        <div className="grid grid-cols-7 gap-1">
+          {calendarDays.map((day, index) => {
+            const dayReservations = getReservationsForDate(day.dateStr)
+            const hasReservations = dayReservations.length > 0
             const isSelected = selectedDate === day.dateStr
+            const hasPending = dayReservations.some((r) => r.status === "pending")
+            const hasConfirmed = dayReservations.some((r) => r.status === "confirmed")
 
             return (
               <button
-                key={day.dateStr}
-                onClick={() => setSelectedDate(isSelected ? null : day.dateStr)}
+                key={index}
+                onClick={() => day.isCurrentMonth && setSelectedDate(isSelected ? null : day.dateStr)}
+                disabled={!day.isCurrentMonth}
                 className={cn(
-                  "p-3 rounded-xl text-center transition-all border-2",
-                  isSelected
-                    ? "bg-primary text-primary-foreground border-primary"
-                    : day.isToday
-                    ? "bg-primary/10 border-primary/30 hover:bg-primary/20"
-                    : "bg-muted/30 border-transparent hover:bg-muted hover:border-muted-foreground/20"
+                  "relative aspect-square p-1 rounded-xl transition-all flex flex-col items-center justify-start pt-2",
+                  day.isCurrentMonth
+                    ? isSelected
+                      ? "bg-primary text-primary-foreground"
+                      : day.isToday
+                      ? "bg-primary/10 ring-2 ring-primary/30"
+                      : "hover:bg-muted"
+                    : "opacity-30 cursor-default"
                 )}
               >
-                <p className={cn(
-                  "text-xs font-medium mb-1",
-                  isSelected ? "text-primary-foreground" : "text-muted-foreground"
-                )}>
-                  {day.dayName.slice(0, 3)}
-                </p>
-                <p className={cn(
-                  "text-lg font-bold",
-                  isSelected ? "text-primary-foreground" : "text-foreground"
-                )}>
-                  {day.dayNumber}
-                </p>
-                {count > 0 && (
-                  <div className={cn(
-                    "mt-1 text-xs font-medium rounded-full px-2 py-0.5",
-                    isSelected
-                      ? "bg-primary-foreground/20 text-primary-foreground"
-                      : "bg-emerald-500/10 text-emerald-600"
-                  )}>
-                    {count} randevu
+                <span
+                  className={cn(
+                    "text-sm font-medium",
+                    !day.isCurrentMonth && "text-muted-foreground",
+                    isSelected && "text-primary-foreground"
+                  )}
+                >
+                  {day.day}
+                </span>
+                
+                {/* Randevu Gostergeleri */}
+                {hasReservations && day.isCurrentMonth && (
+                  <div className="flex items-center gap-0.5 mt-1">
+                    {dayReservations.length <= 3 ? (
+                      dayReservations.map((r, i) => (
+                        <div
+                          key={i}
+                          className={cn(
+                            "w-1.5 h-1.5 rounded-full",
+                            isSelected
+                              ? "bg-primary-foreground/70"
+                              : statusConfig[r.status].dotColor
+                          )}
+                        />
+                      ))
+                    ) : (
+                      <>
+                        <div
+                          className={cn(
+                            "w-1.5 h-1.5 rounded-full",
+                            isSelected ? "bg-primary-foreground/70" : "bg-blue-500"
+                          )}
+                        />
+                        <span
+                          className={cn(
+                            "text-[10px] font-medium ml-0.5",
+                            isSelected ? "text-primary-foreground/70" : "text-muted-foreground"
+                          )}
+                        >
+                          +{dayReservations.length - 1}
+                        </span>
+                      </>
+                    )}
                   </div>
                 )}
               </button>
             )
           })}
+        </div>
+
+        {/* Lejant */}
+        <div className="flex items-center gap-4 mt-4 pt-4 border-t border-border">
+          <span className="text-xs text-muted-foreground">Durum:</span>
+          <div className="flex items-center gap-1">
+            <div className="w-2 h-2 rounded-full bg-amber-500" />
+            <span className="text-xs text-muted-foreground">Beklemede</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div className="w-2 h-2 rounded-full bg-blue-500" />
+            <span className="text-xs text-muted-foreground">Onaylandi</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div className="w-2 h-2 rounded-full bg-emerald-500" />
+            <span className="text-xs text-muted-foreground">Tamamlandi</span>
+          </div>
         </div>
       </div>
 
@@ -425,7 +649,6 @@ export function MyReservationsView({
           filteredReservations.map((reservation) => {
             const StatusIcon = statusConfig[reservation.status].icon
             const [y, m, d] = reservation.date.split("-").map(Number)
-            const formattedDate = `${d} ${turkishMonths[m - 1]}`
 
             return (
               <div
