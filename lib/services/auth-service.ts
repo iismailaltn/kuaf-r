@@ -4,7 +4,7 @@ export interface LoginPayload {
 }
 
 export interface RegisterPayload {
-  restaurantName: string
+  shopName: string
   ownerName: string
   username: string
   phone: string
@@ -13,7 +13,7 @@ export interface RegisterPayload {
 
 export interface AuthUser {
   username: string
-  restaurantName: string
+  shopName: string
   role: string
 }
 
@@ -30,10 +30,10 @@ export async function loginWithApi(payload: LoginPayload): Promise<AuthUser> {
   }
 
   const username = String(json.user?.username ?? payload.username)
-  const restaurantName = String(json.user?.restaurantName ?? json.user?.restaurant_name ?? "Restoran")
+  const shopName = String(json.user?.shopName ?? json.user?.shop_name ?? "Kuaför")
   const role = String(json.user?.role ?? "user").trim().toLowerCase()
 
-  return { username, restaurantName, role }
+  return { username, shopName, role }
 }
 
 export async function registerWithApi(payload: RegisterPayload): Promise<AuthUser> {
@@ -47,7 +47,7 @@ export async function registerWithApi(payload: RegisterPayload): Promise<AuthUse
 
   return {
     username: payload.username,
-    restaurantName: payload.restaurantName,
+    shopName: payload.shopName,
     role: "user",
   }
 }

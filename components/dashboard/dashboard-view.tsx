@@ -14,10 +14,10 @@ import {
 import { CheckCircle2, Users, UtensilsCrossed, Clock } from "lucide-react"
 
 interface DashboardViewProps {
-  restaurantName?: string
+  shopName?: string
 }
 
-export function DashboardView({ restaurantName = "Bella Italia" }: DashboardViewProps) {
+export function DashboardView({ shopName = "Güzel Kuaför" }: DashboardViewProps) {
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -26,7 +26,7 @@ export function DashboardView({ restaurantName = "Bella Italia" }: DashboardView
             Tekrar hos geldin!
           </h1>
           <p className="text-muted-foreground text-sm mt-1">
-            Bugun {restaurantName} icin olanlar burada.
+            Bugün {shopName} için olanlar burada.
           </p>
         </div>
         <Select defaultValue="today">

@@ -40,9 +40,9 @@ export function LoginForm({ onLogin, onSwitchToRegister }: LoginFormProps) {
           <div className="w-20 h-20 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center mb-8">
             <UtensilsCrossed className="w-10 h-10 text-white" />
           </div>
-          <h1 className="text-4xl font-bold mb-4 text-center text-balance">Restoran Yonetimi</h1>
+          <h1 className="text-4xl font-bold mb-4 text-center text-balance">Kuaför Yönetimi</h1>
           <p className="text-lg text-white/80 text-center max-w-md text-pretty">
-            Guclu yonetim paneliyle restoran operasyonlarini kolaylastir.
+            Güçlü yönetim paneliyle kuaför operasyonlarını kolaylaştır.
           </p>
         </div>
       </div>
@@ -60,7 +60,7 @@ export function LoginForm({ onLogin, onSwitchToRegister }: LoginFormProps) {
           <div className="text-center mb-8">
             <h2 className="text-2xl font-bold text-foreground">Tekrar hos geldin</h2>
             <p className="text-muted-foreground mt-2">
-              Restoran paneline giris yap
+              Kuaför paneline giriş yap
             </p>
           </div>
 

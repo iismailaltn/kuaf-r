@@ -37,7 +37,7 @@ interface SidebarProps {
   activeView: ViewType
   onViewChange: (view: ViewType) => void
   onLogout: () => void
-  restaurantName?: string
+  shopName?: string
   role?: UserRole
 }
 
@@ -68,7 +68,7 @@ const navItemsByRole: Record<UserRole, Array<{ id: ViewType; icon: any; label: s
   ],
 }
 
-export function Sidebar({ activeView, onViewChange, onLogout, restaurantName = "Restoran", role = "user" }: SidebarProps) {
+export function Sidebar({ activeView, onViewChange, onLogout, shopName = "Kuaför", role = "user" }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false)
   const navItems = navItemsByRole[role] ?? navItemsByRole.user
   const adminSectionIds: ViewType[] = ["users", "reservations", "performance", "inventory"]
@@ -87,7 +87,7 @@ export function Sidebar({ activeView, onViewChange, onLogout, restaurantName = "
           <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
             <UtensilsCrossed className="w-4 h-4 text-primary-foreground" />
           </div>
-          <span className="font-semibold text-foreground truncate">{restaurantName}</span>
+          <span className="font-semibold text-foreground truncate">{shopName}</span>
         </div>
         {collapsed && (
           <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center mx-auto">

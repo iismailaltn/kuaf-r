@@ -22,7 +22,7 @@ type AuthState = "login" | "register" | "authenticated"
 
 interface User {
   email: string
-  restaurantName: string
+  shopName: string
   role: UserRole
 }
 
@@ -34,7 +34,7 @@ export default function Dashboard() {
   const handleLogin = async (emailOrUsername: string, password: string) => {
     const loginId = emailOrUsername.trim().toLowerCase()
     if (loginId === "admin" && password === "admin") {
-      setUser({ email: "admin", restaurantName: "admin", role: "admin" })
+      setUser({ email: "admin", shopName: "admin", role: "admin" })
       setAuthState("authenticated")
       setActiveView("dashboard")
       return
@@ -45,7 +45,7 @@ export default function Dashboard() {
         password,
       })
       const role = (authUser.role === "admin" || authUser.role === "supervisor") ? authUser.role : "user"
-      setUser({ email: authUser.username, restaurantName: authUser.restaurantName, role })
+      setUser({ email: authUser.username, shopName: authUser.shopName, role })
       setAuthState("authenticated")
       setActiveView("dashboard")
     } catch (e) {
@@ -54,23 +54,23 @@ export default function Dashboard() {
   }
 
   const handleRegister = (data: {
-    restaurantName: string
+    shopName: string
     ownerName: string
     email: string
     phone: string
     password: string
   }) => {
     const emailNormalized = data.email.trim().toLowerCase()
-    const restaurantNormalized = data.restaurantName.trim().toLowerCase()
+    const shopNormalized = data.shopName.trim().toLowerCase()
     const ownerNormalized = data.ownerName.trim().toLowerCase()
 
     if (
       emailNormalized === "admin" &&
-      restaurantNormalized === "admin" &&
+      shopNormalized === "admin" &&
       ownerNormalized === "admin" &&
       data.password === "admin"
     ) {
-      setUser({ email: data.email, restaurantName: data.restaurantName, role: "admin" })
+      setUser({ email: data.email, shopName: data.shopName, role: "admin" })
       setAuthState("authenticated")
       return
     }
@@ -105,7 +105,7 @@ export default function Dashboard() {
   const renderView = () => {
     switch (activeView) {
       case "dashboard":
-        return <DashboardView restaurantName={user?.restaurantName} />
+        return <DashboardView shopName={user?.shopName} />
       case "orders":
         return <OrdersView />
       case "tables":
@@ -115,7 +115,7 @@ export default function Dashboard() {
       case "inventory":
         return <InventoryView />
       case "settings":
-        return <SettingsView user={user ? { email: user.email, restaurantName: user.restaurantName, role: user.role } : undefined} />
+        return <SettingsView user={user ? { email: user.email, shopName: user.shopName, role: user.role } : undefined} />
       case "users":
         return <UsersView />
       case "reservations":
@@ -125,7 +125,7 @@ export default function Dashboard() {
       case "reviews":
         return <ReviewsView />
       case "my-reservations":
-        return <MyReservationsView staffName={user?.restaurantName} />
+        return <MyReservationsView staffName={user?.shopName} />
       case "customers":
         return (
           <div className="p-6">
@@ -134,7 +134,7 @@ export default function Dashboard() {
           </div>
         )
       default:
-        return <DashboardView restaurantName={user?.restaurantName} />
+        return <DashboardView shopName={user?.shopName} />
     }
   }
 
@@ -144,7 +144,7 @@ export default function Dashboard() {
         activeView={activeView}
         onViewChange={setActiveView}
         onLogout={handleLogout}
-        restaurantName={user?.restaurantName}
+        shopName={user?.shopName}
         role={user?.role}
       />
       <div className="flex-1 flex flex-col overflow-hidden">

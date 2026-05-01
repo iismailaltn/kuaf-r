@@ -27,7 +27,7 @@ import { cn } from "@/lib/utils"
 interface SettingsViewProps {
   user?: {
     email: string
-    restaurantName: string
+    shopName: string
     role: string
   }
 }
@@ -43,7 +43,7 @@ export function SettingsView({ user }: SettingsViewProps) {
     lastName: "Altin",
     email: user?.email || "ismail@example.com",
     phone: "+90 555 123 4567",
-    companyName: user?.restaurantName || "Restoran",
+    companyName: user?.shopName || "Kuaför",
     address: "Istanbul, Turkiye",
     profileImage: null as string | null
   })

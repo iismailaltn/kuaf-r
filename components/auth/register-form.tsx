@@ -18,7 +18,7 @@ import Link from "next/link"
 
 interface RegisterFormProps {
   onRegister: (data: {
-    restaurantName: string
+    shopName: string
     ownerName: string
     email: string
     phone: string
@@ -29,7 +29,7 @@ interface RegisterFormProps {
 
 export function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFormProps) {
   const [formData, setFormData] = useState({
-    restaurantName: "",
+    shopName: "",
     ownerName: "",
     email: "",
     phone: "",
@@ -54,7 +54,7 @@ export function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFormProps)
     setIsLoading(true)
     await new Promise((resolve) => setTimeout(resolve, 1000))
     onRegister({
-      restaurantName: formData.restaurantName,
+      shopName: formData.shopName,
       ownerName: formData.ownerName,
       email: formData.email,
       phone: formData.phone,
@@ -75,22 +75,22 @@ export function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFormProps)
           <div className="w-20 h-20 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center mb-8">
             <UtensilsCrossed className="w-10 h-10 text-white" />
           </div>
-          <h1 className="text-4xl font-bold mb-4 text-center text-balance">Yolculuguna Basla</h1>
+          <h1 className="text-4xl font-bold mb-4 text-center text-balance">Yolculuğuna Başla</h1>
           <p className="text-lg text-white/80 text-center max-w-md text-pretty">
-            Siparis, masa ve stogu yonetmek icin platformumuzu kullanan binlerce restorana katil.
+            Randevu, işçi ve hizmet yönetmek için platformumuzu kullanan binlerce kuaföre katıl.
           </p>
           <div className="mt-12 grid grid-cols-3 gap-8 text-center">
             <div>
               <p className="text-3xl font-bold">5K+</p>
-              <p className="text-sm text-white/70">Restoran</p>
+              <p className="text-sm text-white/70">Kuaför</p>
             </div>
             <div>
               <p className="text-3xl font-bold">1M+</p>
-              <p className="text-sm text-white/70">Siparis</p>
+              <p className="text-sm text-white/70">Randevu</p>
             </div>
             <div>
               <p className="text-3xl font-bold">99%</p>
-              <p className="text-sm text-white/70">Calisma suresi</p>
+              <p className="text-sm text-white/70">Çalışma süresi</p>
             </div>
           </div>
         </div>
@@ -109,22 +109,22 @@ export function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFormProps)
           <div className="text-center mb-6">
             <h2 className="text-2xl font-bold text-foreground">Hesap olustur</h2>
             <p className="text-muted-foreground mt-2">
-              Baslamak icin restoranini kaydet
+              Başlamak için kuaförünü kaydet
             </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <label className="text-sm font-medium text-foreground">
-                Restoran adi
+                Kuaför adı
               </label>
               <div className="relative">
                 <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                 <Input
                   type="text"
-                  name="restaurantName"
-                  placeholder="Restoran adin"
-                  value={formData.restaurantName}
+                  name="shopName"
+                  placeholder="Kuaför adını gir"
+                  value={formData.shopName}
                   onChange={handleChange}
                   className="pl-10 h-12 rounded-xl bg-muted/50 border-border"
                   required
@@ -134,7 +134,7 @@ export function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFormProps)
 
             <div className="space-y-2">
               <label className="text-sm font-medium text-foreground">
-                Isletme sahibi
+                İşletme sahibi
               </label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
