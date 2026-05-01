@@ -102,12 +102,23 @@ export function SettingsView({ user }: SettingsViewProps) {
     { id: "sakal-kesimi", label: "Sakal Kesimi" },
   ]
   const [selectedServices, setSelectedServices] = useState<string[]>(["sac-kesimi", "sakal-kesimi"])
+  const [servicePrices, setServicePrices] = useState<Record<string, string>>({
+    "sac-kesimi": "50",
+    "sakal-kesimi": "30"
+  })
   const [servicesSaved, setServicesSaved] = useState(false)
 
   const toggleService = (id: string) => {
     setSelectedServices(prev =>
       prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id]
     )
+  }
+
+  const updateServicePrice = (id: string, price: string) => {
+    setServicePrices(prev => ({
+      ...prev,
+      [id]: price
+    }))
   }
 
   const handleServicesSave = () => {
@@ -176,7 +187,7 @@ export function SettingsView({ user }: SettingsViewProps) {
   }
 
   const renderBusinessTab = () => (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div>
         <h3 className="text-lg font-semibold text-foreground mb-1">Isletme Ayarlari</h3>
         <p className="text-sm text-muted-foreground">
@@ -184,7 +195,7 @@ export function SettingsView({ user }: SettingsViewProps) {
         </p>
       </div>
 
-      {/* Services Grid */}
+      {/* Services Selection */}
       <div>
         <h4 className="text-sm font-semibold text-foreground mb-4">Yapilacak Islemler</h4>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -223,25 +234,65 @@ export function SettingsView({ user }: SettingsViewProps) {
         </div>
       </div>
 
-      {/* Summary */}
-      <div className="p-4 rounded-lg bg-muted/40 border border-border">
-        <p className="text-sm font-medium text-foreground mb-2">
-          Seçili Hizmetler ({selectedServices.length}/{ALL_SERVICES.length})
-        </p>
-        {selectedServices.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Henüz hiçbir hizmet seçilmedi.</p>
-        ) : (
-          <div className="flex flex-wrap gap-2">
-            {ALL_SERVICES.filter(s => selectedServices.includes(s.id)).map(s => (
-              <span
-                key={s.id}
-                className="px-2.5 py-1 text-xs font-medium bg-primary/10 text-primary rounded-full"
-              >
-                {s.label}
-              </span>
+      {/* Service Pricing */}
+      {selectedServices.length > 0 && (
+        <div className="space-y-4">
+          <div>
+            <h4 className="text-sm font-semibold text-foreground mb-4">Islem Fiyatlari</h4>
+            <p className="text-xs text-muted-foreground mb-4">
+              Seçili hizmetlerin fiyatlarını girin.
+            </p>
+          </div>
+          <div className="space-y-3">
+            {ALL_SERVICES.filter(s => selectedServices.includes(s.id)).map((service) => (
+              <div key={service.id} className="flex items-center gap-4 p-3 rounded-lg bg-muted/30 border border-border">
+                <div className="flex-1">
+                  <label className="text-sm font-medium text-foreground block">
+                    {service.label}
+                  </label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.50"
+                    value={servicePrices[service.id] || ""}
+                    onChange={(e) => updateServicePrice(service.id, e.target.value)}
+                    placeholder="0.00"
+                    className="w-24 px-3 py-2 rounded-lg bg-background border border-border text-foreground placeholder-muted-foreground text-right font-medium focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                  <span className="text-sm font-medium text-muted-foreground">₺</span>
+                </div>
+              </div>
             ))}
           </div>
-        )}
+        </div>
+      )}
+
+      {/* Summary */}
+      <div className="p-4 rounded-lg bg-muted/40 border border-border space-y-3">
+        <div>
+          <p className="text-sm font-medium text-foreground mb-2">
+            Seçili Hizmetler ({selectedServices.length}/{ALL_SERVICES.length})
+          </p>
+          {selectedServices.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Henüz hiçbir hizmet seçilmedi.</p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {ALL_SERVICES.filter(s => selectedServices.includes(s.id)).map(s => {
+                const price = servicePrices[s.id]
+                return (
+                  <span
+                    key={s.id}
+                    className="px-2.5 py-1 text-xs font-medium bg-primary/10 text-primary rounded-full"
+                  >
+                    {s.label} {price ? `- ${price}₺` : ""}
+                  </span>
+                )
+              })}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Save Button */}
