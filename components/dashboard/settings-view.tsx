@@ -101,29 +101,41 @@ export function SettingsView({ user }: SettingsViewProps) {
     { id: "agda", label: "Ağda" },
     { id: "sakal-kesimi", label: "Sakal Kesimi" },
   ]
-  const [selectedServices, setSelectedServices] = useState<string[]>(["sac-kesimi", "sakal-kesimi"])
+  // "idle" = not selected | "editing" = selected, price input open | "saved" = price confirmed (green)
+  const [serviceStates, setServiceStates] = useState<Record<string, "idle" | "editing" | "saved">>({
+    "sac-kesimi": "saved",
+    "sakal-kesimi": "saved",
+  })
   const [servicePrices, setServicePrices] = useState<Record<string, string>>({
     "sac-kesimi": "50",
-    "sakal-kesimi": "30"
+    "sakal-kesimi": "30",
   })
-  const [servicesSaved, setServicesSaved] = useState(false)
+  // derived helper
+  const selectedServices = Object.entries(serviceStates)
+    .filter(([, s]) => s !== "idle")
+    .map(([id]) => id)
 
-  const toggleService = (id: string) => {
-    setSelectedServices(prev =>
-      prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id]
-    )
+  const handleServiceCardClick = (id: string) => {
+    setServiceStates(prev => {
+      const current = prev[id] ?? "idle"
+      if (current === "idle") return { ...prev, [id]: "editing" }
+      if (current === "saved") return { ...prev, [id]: "editing" }
+      // editing -> clicking card again does nothing (use buttons inside)
+      return prev
+    })
+  }
+
+  const handleServiceSave = (id: string) => {
+    setServiceStates(prev => ({ ...prev, [id]: "saved" }))
+  }
+
+  const handleServiceRemove = (id: string) => {
+    setServiceStates(prev => ({ ...prev, [id]: "idle" }))
+    setServicePrices(prev => { const next = { ...prev }; delete next[id]; return next })
   }
 
   const updateServicePrice = (id: string, price: string) => {
-    setServicePrices(prev => ({
-      ...prev,
-      [id]: price
-    }))
-  }
-
-  const handleServicesSave = () => {
-    setServicesSaved(true)
-    setTimeout(() => setServicesSaved(false), 3000)
+    setServicePrices(prev => ({ ...prev, [id]: price }))
   }
 
   const tabs = [
@@ -191,106 +203,104 @@ export function SettingsView({ user }: SettingsViewProps) {
       <div>
         <h3 className="text-base font-semibold text-foreground mb-1">Isletme Ayarlari</h3>
         <p className="text-xs text-muted-foreground">
-          Sunulan hizmetleri seçin ve fiyatlarını belirleyin.
+          Hizmete tıklayın, fiyatı girin ve kaydedin. Kaydettiğinizde kart yeşile döner.
         </p>
       </div>
 
-      {/* Services Grid */}
       <div>
-        <h4 className="text-xs font-semibold text-foreground mb-3">Yapilacak Islemler</h4>
+        <h4 className="text-xs font-semibold text-foreground mb-3">
+          Yapilacak Islemler
+          <span className="ml-2 font-normal text-muted-foreground">
+            ({selectedServices.length}/{ALL_SERVICES.length} secildi)
+          </span>
+        </h4>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
           {ALL_SERVICES.map((service) => {
-            const isSelected = selectedServices.includes(service.id)
+            const state = serviceStates[service.id] ?? "idle"
+            const price = servicePrices[service.id] || ""
+
             return (
-              <button
+              <div
                 key={service.id}
-                onClick={() => toggleService(service.id)}
                 className={cn(
-                  "flex flex-col items-center gap-2 p-3 rounded-lg border transition-all",
-                  isSelected
-                    ? "border-primary bg-primary/10"
-                    : "border-border bg-background hover:border-primary/40 hover:bg-muted/30"
+                  "rounded-lg border overflow-hidden transition-all",
+                  state === "idle" && "border-border bg-background",
+                  state === "editing" && "border-primary bg-primary/5",
+                  state === "saved" && "border-green-500 bg-green-50 dark:bg-green-950/20",
                 )}
               >
-                <div className={cn(
-                  "w-8 h-8 rounded-md flex items-center justify-center transition-colors",
-                  isSelected ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
-                )}>
-                  {isSelected ? (
-                    <Check className="w-3.5 h-3.5" />
-                  ) : (
-                    <Scissors className="w-3.5 h-3.5" />
-                  )}
-                </div>
-                <span className={cn(
-                  "text-xs font-medium text-center line-clamp-2 transition-colors",
-                  isSelected ? "text-foreground" : "text-muted-foreground"
-                )}>
-                  {service.label}
-                </span>
-              </button>
+                {/* Card Header — always clickable */}
+                <button
+                  type="button"
+                  onClick={() => handleServiceCardClick(service.id)}
+                  className="w-full flex items-center gap-2 px-3 py-2.5 text-left"
+                >
+                  <div className={cn(
+                    "w-6 h-6 rounded flex items-center justify-center flex-shrink-0 transition-colors",
+                    state === "idle" && "bg-muted text-muted-foreground",
+                    state === "editing" && "bg-primary text-primary-foreground",
+                    state === "saved" && "bg-green-500 text-white",
+                  )}>
+                    {state === "saved" ? (
+                      <Check className="w-3 h-3" />
+                    ) : (
+                      <Scissors className="w-3 h-3" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className={cn(
+                      "text-xs font-medium truncate transition-colors",
+                      state === "idle" && "text-muted-foreground",
+                      state === "editing" && "text-foreground",
+                      state === "saved" && "text-green-700 dark:text-green-400",
+                    )}>
+                      {service.label}
+                    </p>
+                    {state === "saved" && price && (
+                      <p className="text-[10px] text-green-600 dark:text-green-500 font-medium">{price} ₺</p>
+                    )}
+                  </div>
+                </button>
+
+                {/* Inline price input — only when editing */}
+                {state === "editing" && (
+                  <div className="px-3 pb-2.5 space-y-2">
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        autoFocus
+                        value={price}
+                        onChange={(e) => updateServicePrice(service.id, e.target.value)}
+                        placeholder="0"
+                        className="w-full px-2 py-1 text-xs rounded border border-border bg-background text-foreground text-right font-medium focus:outline-none focus:ring-1 focus:ring-primary"
+                      />
+                      <span className="text-xs text-muted-foreground flex-shrink-0">₺</span>
+                    </div>
+                    <div className="flex gap-1">
+                      <button
+                        type="button"
+                        onClick={() => handleServiceSave(service.id)}
+                        className="flex-1 flex items-center justify-center gap-1 py-1 bg-primary text-primary-foreground rounded text-[10px] font-medium hover:bg-primary/90 transition-colors"
+                      >
+                        <Check className="w-2.5 h-2.5" />
+                        Kaydet
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleServiceRemove(service.id)}
+                        className="flex-1 py-1 border border-border rounded text-[10px] font-medium text-muted-foreground hover:bg-muted transition-colors"
+                      >
+                        Kaldir
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             )
           })}
         </div>
-      </div>
-
-      {/* Service Pricing */}
-      {selectedServices.length > 0 && (
-        <div className="space-y-3">
-          <h4 className="text-xs font-semibold text-foreground">Islem Fiyatlari</h4>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-            {ALL_SERVICES.filter(s => selectedServices.includes(s.id)).map((service) => (
-              <div key={service.id} className="space-y-1">
-                <label className="text-xs font-medium text-foreground block truncate">
-                  {service.label}
-                </label>
-                <div className="flex items-center gap-1">
-                  <input
-                    type="number"
-                    min="0"
-                    step="1"
-                    value={servicePrices[service.id] || ""}
-                    onChange={(e) => updateServicePrice(service.id, e.target.value)}
-                    placeholder="0"
-                    className="w-full px-2 py-1.5 text-xs rounded border border-border bg-background text-foreground text-right font-medium focus:outline-none focus:ring-1 focus:ring-primary"
-                  />
-                  <span className="text-xs font-medium text-muted-foreground min-w-fit">₺</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Summary */}
-      <div className="flex items-center justify-between text-xs text-muted-foreground p-2 rounded bg-muted/30 border border-border">
-        <span className="font-medium">{selectedServices.length}/{ALL_SERVICES.length} hizmet secildi</span>
-        {selectedServices.length > 0 && (
-          <button
-            onClick={() => setSelectedServices([])}
-            className="text-destructive hover:underline text-xs"
-          >
-            Kaldir
-          </button>
-        )}
-      </div>
-
-      {/* Save Button */}
-      <div className="flex items-center gap-2 pt-2">
-        <button
-          onClick={handleServicesSave}
-          disabled={selectedServices.length === 0}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-primary-foreground rounded text-xs font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <Save className="w-3 h-3" />
-          Kaydet
-        </button>
-        {servicesSaved && (
-          <span className="flex items-center gap-1 text-xs text-green-600">
-            <Check className="w-3 h-3" />
-            Kaydedildi
-          </span>
-        )}
       </div>
     </div>
   )
