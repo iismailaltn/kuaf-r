@@ -20,7 +20,8 @@ import {
   Mail,
   Building2,
   Phone,
-  MapPin
+  MapPin,
+  Scissors
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -32,7 +33,7 @@ interface SettingsViewProps {
   }
 }
 
-type SettingsTab = "profile" | "security" | "google" | "notifications" | "appearance"
+type SettingsTab = "profile" | "security" | "google" | "notifications" | "appearance" | "business"
 
 export function SettingsView({ user }: SettingsViewProps) {
   const [activeTab, setActiveTab] = useState<SettingsTab>("profile")
@@ -87,8 +88,36 @@ export function SettingsView({ user }: SettingsViewProps) {
     language: "tr"
   })
 
+  // Business services state
+  const ALL_SERVICES = [
+    { id: "sac-kesimi", label: "Saç Kesimi" },
+    { id: "sac-boyama", label: "Saç Boyama" },
+    { id: "fon", label: "Fon" },
+    { id: "manikur", label: "Manikür" },
+    { id: "pedikur", label: "Pedikür" },
+    { id: "cilt-bakimi", label: "Cilt Bakımı" },
+    { id: "makyaj", label: "Makyaj" },
+    { id: "kas-dizayn", label: "Kaş Dizayn" },
+    { id: "agda", label: "Ağda" },
+    { id: "sakal-kesimi", label: "Sakal Kesimi" },
+  ]
+  const [selectedServices, setSelectedServices] = useState<string[]>(["sac-kesimi", "sakal-kesimi"])
+  const [servicesSaved, setServicesSaved] = useState(false)
+
+  const toggleService = (id: string) => {
+    setSelectedServices(prev =>
+      prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id]
+    )
+  }
+
+  const handleServicesSave = () => {
+    setServicesSaved(true)
+    setTimeout(() => setServicesSaved(false), 3000)
+  }
+
   const tabs = [
     { id: "profile" as SettingsTab, label: "Profil", icon: User, description: "Kisisel bilgilerinizi duzenleyin" },
+    { id: "business" as SettingsTab, label: "Isletme Ayarlari", icon: Scissors, description: "Sunulan hizmetleri yonetin" },
     { id: "security" as SettingsTab, label: "Sifre ve Guvenlik", icon: Lock, description: "Hesap guvenliginizi yonetin" },
     { id: "google" as SettingsTab, label: "Google Ayarlari", icon: Key, description: "Google API baglantinizi yonetin" },
     { id: "notifications" as SettingsTab, label: "Bildirimler", icon: Bell, description: "Bildirim tercihlerinizi ayarlayin" },
@@ -145,6 +174,95 @@ export function SettingsView({ user }: SettingsViewProps) {
       reader.readAsDataURL(file)
     }
   }
+
+  const renderBusinessTab = () => (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-lg font-semibold text-foreground mb-1">Isletme Ayarlari</h3>
+        <p className="text-sm text-muted-foreground">
+          Isletmenizde sunulan hizmetleri seçin. Yalnızca seçili hizmetler randevu ve diğer ekranlarda görünür.
+        </p>
+      </div>
+
+      {/* Services Grid */}
+      <div>
+        <h4 className="text-sm font-semibold text-foreground mb-4">Yapilacak Islemler</h4>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {ALL_SERVICES.map((service) => {
+            const isSelected = selectedServices.includes(service.id)
+            return (
+              <button
+                key={service.id}
+                onClick={() => toggleService(service.id)}
+                className={cn(
+                  "flex items-center gap-3 p-4 rounded-xl border-2 text-left transition-all",
+                  isSelected
+                    ? "border-primary bg-primary/5"
+                    : "border-border bg-background hover:border-primary/40 hover:bg-muted/30"
+                )}
+              >
+                <div className={cn(
+                  "w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors",
+                  isSelected ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+                )}>
+                  {isSelected ? (
+                    <Check className="w-4 h-4" />
+                  ) : (
+                    <Scissors className="w-4 h-4" />
+                  )}
+                </div>
+                <span className={cn(
+                  "text-sm font-medium transition-colors",
+                  isSelected ? "text-foreground" : "text-muted-foreground"
+                )}>
+                  {service.label}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Summary */}
+      <div className="p-4 rounded-lg bg-muted/40 border border-border">
+        <p className="text-sm font-medium text-foreground mb-2">
+          Seçili Hizmetler ({selectedServices.length}/{ALL_SERVICES.length})
+        </p>
+        {selectedServices.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Henüz hiçbir hizmet seçilmedi.</p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {ALL_SERVICES.filter(s => selectedServices.includes(s.id)).map(s => (
+              <span
+                key={s.id}
+                className="px-2.5 py-1 text-xs font-medium bg-primary/10 text-primary rounded-full"
+              >
+                {s.label}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Save Button */}
+      <div className="flex items-center gap-3 pt-2">
+        <button
+          onClick={handleServicesSave}
+          disabled={selectedServices.length === 0}
+          className="flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <Save className="w-4 h-4" />
+          Hizmetleri Kaydet
+        </button>
+        {servicesSaved && (
+          <span className="flex items-center gap-1.5 text-sm text-green-600">
+            <Check className="w-4 h-4" />
+            Kaydedildi
+          </span>
+        )}
+      </div>
+    </div>
+  )
 
   const renderProfileTab = () => (
     <div className="space-y-6">
@@ -703,6 +821,8 @@ export function SettingsView({ user }: SettingsViewProps) {
     switch (activeTab) {
       case "profile":
         return renderProfileTab()
+      case "business":
+        return renderBusinessTab()
       case "security":
         return renderSecurityTab()
       case "google":
