@@ -187,94 +187,107 @@ export function SettingsView({ user }: SettingsViewProps) {
   }
 
   const renderBusinessTab = () => (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div>
-        <h3 className="text-base font-semibold text-foreground mb-0.5">Isletme Ayarlari</h3>
+        <h3 className="text-base font-semibold text-foreground mb-1">Isletme Ayarlari</h3>
         <p className="text-xs text-muted-foreground">
           Sunulan hizmetleri seçin ve fiyatlarını belirleyin.
         </p>
       </div>
 
-      {/* Combined Services & Pricing Table */}
-      <div className="border border-border rounded-lg overflow-hidden">
-        <div className="bg-muted/50 px-3 py-2 border-b border-border">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-foreground">Hizmet</span>
-            <span className="text-xs font-medium text-foreground w-20 text-right">Fiyat (₺)</span>
-          </div>
-        </div>
-        <div className="divide-y divide-border">
+      {/* Services Grid */}
+      <div>
+        <h4 className="text-xs font-semibold text-foreground mb-3">Yapilacak Islemler</h4>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
           {ALL_SERVICES.map((service) => {
             const isSelected = selectedServices.includes(service.id)
             return (
-              <div
+              <button
                 key={service.id}
+                onClick={() => toggleService(service.id)}
                 className={cn(
-                  "flex items-center justify-between px-3 py-2 transition-colors",
-                  isSelected ? "bg-primary/5" : "bg-background hover:bg-muted/30"
+                  "flex flex-col items-center gap-2 p-3 rounded-lg border transition-all",
+                  isSelected
+                    ? "border-primary bg-primary/10"
+                    : "border-border bg-background hover:border-primary/40 hover:bg-muted/30"
                 )}
               >
-                <label className="flex items-center gap-2 cursor-pointer flex-1">
-                  <input
-                    type="checkbox"
-                    checked={isSelected}
-                    onChange={() => toggleService(service.id)}
-                    className="w-4 h-4 rounded border-border text-primary focus:ring-primary focus:ring-offset-0"
-                  />
-                  <span className={cn(
-                    "text-sm transition-colors",
-                    isSelected ? "text-foreground font-medium" : "text-muted-foreground"
-                  )}>
-                    {service.label}
-                  </span>
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={servicePrices[service.id] || ""}
-                  onChange={(e) => updateServicePrice(service.id, e.target.value)}
-                  placeholder="0"
-                  disabled={!isSelected}
-                  className={cn(
-                    "w-20 px-2 py-1 text-sm rounded border text-right font-medium focus:outline-none focus:ring-1 focus:ring-primary",
-                    isSelected
-                      ? "bg-background border-border text-foreground"
-                      : "bg-muted/50 border-transparent text-muted-foreground cursor-not-allowed"
+                <div className={cn(
+                  "w-8 h-8 rounded-md flex items-center justify-center transition-colors",
+                  isSelected ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+                )}>
+                  {isSelected ? (
+                    <Check className="w-3.5 h-3.5" />
+                  ) : (
+                    <Scissors className="w-3.5 h-3.5" />
                   )}
-                />
-              </div>
+                </div>
+                <span className={cn(
+                  "text-xs font-medium text-center line-clamp-2 transition-colors",
+                  isSelected ? "text-foreground" : "text-muted-foreground"
+                )}>
+                  {service.label}
+                </span>
+              </button>
             )
           })}
         </div>
       </div>
 
-      {/* Quick Summary */}
-      <div className="flex items-center justify-between text-xs text-muted-foreground px-1">
-        <span>{selectedServices.length} hizmet secildi</span>
+      {/* Service Pricing */}
+      {selectedServices.length > 0 && (
+        <div className="space-y-3">
+          <h4 className="text-xs font-semibold text-foreground">Islem Fiyatlari</h4>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+            {ALL_SERVICES.filter(s => selectedServices.includes(s.id)).map((service) => (
+              <div key={service.id} className="space-y-1">
+                <label className="text-xs font-medium text-foreground block truncate">
+                  {service.label}
+                </label>
+                <div className="flex items-center gap-1">
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={servicePrices[service.id] || ""}
+                    onChange={(e) => updateServicePrice(service.id, e.target.value)}
+                    placeholder="0"
+                    className="w-full px-2 py-1.5 text-xs rounded border border-border bg-background text-foreground text-right font-medium focus:outline-none focus:ring-1 focus:ring-primary"
+                  />
+                  <span className="text-xs font-medium text-muted-foreground min-w-fit">₺</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Summary */}
+      <div className="flex items-center justify-between text-xs text-muted-foreground p-2 rounded bg-muted/30 border border-border">
+        <span className="font-medium">{selectedServices.length}/{ALL_SERVICES.length} hizmet secildi</span>
         {selectedServices.length > 0 && (
           <button
             onClick={() => setSelectedServices([])}
-            className="text-destructive hover:underline"
+            className="text-destructive hover:underline text-xs"
           >
-            Tumunu kaldir
+            Kaldir
           </button>
         )}
       </div>
 
       {/* Save Button */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 pt-2">
         <button
           onClick={handleServicesSave}
           disabled={selectedServices.length === 0}
-          className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-primary-foreground rounded text-xs font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <Save className="w-3.5 h-3.5" />
+          <Save className="w-3 h-3" />
           Kaydet
         </button>
         {servicesSaved && (
           <span className="flex items-center gap-1 text-xs text-green-600">
-            <Check className="w-3.5 h-3.5" />
+            <Check className="w-3 h-3" />
             Kaydedildi
           </span>
         )}
