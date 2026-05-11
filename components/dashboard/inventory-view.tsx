@@ -22,6 +22,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { cn } from "@/lib/utils"
+import { getProductCategoryId, getProductCategoryLabel, productCategoryOptions } from "@/lib/product-categories"
 import {
   AlertTriangle,
   ChevronLeft,
@@ -137,12 +138,7 @@ const statusColors: Record<string, string> = {
   "stokta yok": "bg-red-100 text-red-700 border-red-200",
 }
 
-const categoryOptions = [
-  { value: "1", label: "Sac Bakim" },
-  { value: "2", label: "Sac Boyasi" },
-  { value: "3", label: "Styling" },
-  { value: "4", label: "Cilt & Makyaj" },
-]
+const categoryOptions = productCategoryOptions
 
 export function InventoryView() {
   const [inventory, setInventory] = useState(initialInventory)
@@ -184,11 +180,14 @@ export function InventoryView() {
       const statusRaw = String(row.status ?? row.Status ?? "").trim().toLowerCase()
       const status = statusRaw || (stock <= 0 ? "stokta yok" : stock <= minStock ? "dusuk stok" : "mevcut")
 
+      const categoryId = getProductCategoryId(row)
+
       return {
         id: String(row.id ?? `PRD${String(index + 1).padStart(3, "0")}`),
         name: String(row.name ?? "Urun"),
         description: String(row.description ?? "-"),
-        category: String(row.category ?? row.category_name ?? row.categoryName ?? row.categoryId ?? "-"),
+        categoryId,
+        category: getProductCategoryLabel(row),
         price: String(row.price ?? "0"),
         cost: String(row.cost ?? row.Cost ?? "0"),
         stock,
@@ -292,7 +291,7 @@ export function InventoryView() {
     setEditProduct({
       name: String(current.name ?? ""),
       description: String(current.description ?? ""),
-      category: categoryOptions.find((c) => c.label === current.category)?.value ?? "1",
+      category: categoryOptions.find((c) => c.label === current.category || c.value === String(current.categoryId ?? current.category))?.value ?? "1",
       price: String(current.price ?? ""),
       cost: String(current.cost ?? ""),
       stock: String(current.stock ?? "0"),

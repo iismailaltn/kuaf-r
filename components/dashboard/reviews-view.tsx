@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useCallback, useEffect, useState } from "react"
+import { useGooglePlaceSettings } from "@/hooks/use-google-place-settings"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -31,51 +32,8 @@ interface Review {
   relativeTime: string
 }
 
-// Mock reviews for demonstration
-const mockReviews: Review[] = [
-  {
-    id: "1",
-    author: "Ahmet Yilmaz",
-    rating: 5,
-    text: "Harika bir mekan! Yemekler cok lezzetli ve servis mukemmel. Kesinlikle tekrar gelecegim. Ozellikle izgara et ve mezeler siddette tavsiye edilir.",
-    time: "2024-01-15",
-    relativeTime: "2 hafta once",
-  },
-  {
-    id: "2",
-    author: "Elif Demir",
-    rating: 4,
-    text: "Atmosfer cok guzel, yemekler lezzetli. Sadece bekleme suresi biraz uzundu ama degdi. Personel cok ilgili ve guler yuzlu.",
-    time: "2024-01-10",
-    relativeTime: "3 hafta once",
-  },
-  {
-    id: "3",
-    author: "Mehmet Kaya",
-    rating: 5,
-    text: "En sevdigim restoran! Her gelisimde ayni kaliteyi yakalamak gercekten takdir edilesi. Taze malzemeler ve ozenli sunum.",
-    time: "2024-01-08",
-    relativeTime: "3 hafta once",
-  },
-  {
-    id: "4",
-    author: "Zeynep Arslan",
-    rating: 3,
-    text: "Yemekler fena degildi ama fiyatlar biraz yuksek. Porsiyonlar daha buyuk olabilirdi. Lokasyon guzel ve park sorunu yok.",
-    time: "2024-01-05",
-    relativeTime: "1 ay once",
-  },
-  {
-    id: "5",
-    author: "Can Ozturk",
-    rating: 5,
-    text: "Dogum gunumu burada kutladik, ekip bize ozel ilgi gosterdi. Surpriz pasta ve dekorasyon icin cok tesekkurler!",
-    time: "2024-01-02",
-    relativeTime: "1 ay once",
-  },
-]
-
 export function ReviewsView() {
+  const { settings, isSaving, saveSettings } = useGooglePlaceSettings()
   const [apiKey, setApiKey] = useState("")
   const [placeId, setPlaceId] = useState("")
   const [isConnected, setIsConnected] = useState(false)
@@ -83,6 +41,39 @@ export function ReviewsView() {
   const [reviews, setReviews] = useState<Review[]>([])
   const [showInstructions, setShowInstructions] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  const loadReviews = useCallback(async () => {
+    setIsConnecting(true)
+    setError(null)
+
+    try {
+      const res = await fetch("/api/google-reviews", { cache: "no-store" })
+      const data = await res.json().catch(() => null)
+      if (!res.ok || !data?.ok || !Array.isArray(data?.reviews)) {
+        setError(String(data?.message ?? "Google yorumlari getirilemedi."))
+        return false
+      }
+
+      setReviews(data.reviews)
+      setIsConnected(true)
+      return true
+    } catch {
+      setError("Google yorumlari getirilirken bir hata olustu.")
+      return false
+    } finally {
+      setIsConnecting(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!settings) {
+      return
+    }
+
+    setApiKey(settings.placesApiKey)
+    setPlaceId(settings.placeId)
+    void loadReviews()
+  }, [settings, loadReviews])
 
   const handleConnect = async () => {
     if (!apiKey.trim() || !placeId.trim()) {
@@ -93,13 +84,14 @@ export function ReviewsView() {
     setIsConnecting(true)
     setError(null)
 
-    // Simulate API connection
-    await new Promise((resolve) => setTimeout(resolve, 1500))
+    const result = await saveSettings(apiKey.trim(), placeId.trim())
+    if (!result.ok) {
+      setError(result.message)
+      setIsConnecting(false)
+      return
+    }
 
-    // For demo purposes, use mock data
-    setReviews(mockReviews)
-    setIsConnected(true)
-    setIsConnecting(false)
+    await loadReviews()
   }
 
   const handleDisconnect = () => {
@@ -110,9 +102,7 @@ export function ReviewsView() {
   }
 
   const handleRefresh = async () => {
-    setIsConnecting(true)
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-    setIsConnecting(false)
+    await loadReviews()
   }
 
   const averageRating =
@@ -194,7 +184,7 @@ export function ReviewsView() {
 
               <Button
                 onClick={handleConnect}
-                disabled={isConnecting}
+                disabled={isConnecting || isSaving}
                 className="w-full h-12 rounded-xl text-base font-medium"
               >
                 {isConnecting ? (
@@ -387,7 +377,7 @@ export function ReviewsView() {
           <Button
             variant="outline"
             onClick={handleRefresh}
-            disabled={isConnecting}
+            disabled={isConnecting || isSaving}
             className="rounded-xl"
           >
             <RefreshCw

@@ -1,11 +1,12 @@
 "use client"
 
-import { useEffect, useState, useRef } from "react"
+import { useCallback, useEffect, useState, useRef } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
+import { useSalonServices } from "@/hooks/use-salon-services"
 import { 
   Plus, Users, Clock, Scissors, X, Pencil, Trash2, Save, MapPin, 
   User, FileText, Camera, Upload, Instagram, Globe, Play, CheckCircle 
@@ -29,43 +30,51 @@ interface SessionData {
   startTime: number
 }
 
-// Hizmet seçenekleri (users-view.tsx'deki specialtyOptions ile aynı)
-const serviceOptions = [
-  "Sac Kesimi",
-  "Sac Boyama",
-  "Fon",
-  "Manikur",
-  "Pedikur",
-  "Cilt Bakimi",
-  "Makyaj",
-  "Kas Dizayn",
-  "Agda",
-  "Sakal Kesimi",
-]
+interface StaffMember {
+  id: string
+  name: string
+  specialties: string[]
+}
 
-// Örnek personel listesi
-const staffList = [
-  { id: "EMP001", name: "Ahmet Yilmaz", specialties: ["Sac Kesimi", "Sakal Kesimi"] },
-  { id: "EMP002", name: "Ayse Kaya", specialties: ["Sac Boyama", "Fon", "Makyaj"] },
-  { id: "EMP003", name: "Mehmet Demir", specialties: ["Sac Kesimi", "Sac Boyama"] },
-  { id: "EMP004", name: "Fatma Celik", specialties: ["Manikur", "Pedikur", "Cilt Bakimi"] },
-  { id: "EMP005", name: "Ali Ozturk", specialties: ["Kas Dizayn", "Agda"] },
-]
+interface PersonelApiRow {
+  id?: string | number
+  full_name?: string
+  first_name?: string
+  last_name?: string
+  expertise?: string
+  is_active?: boolean | number | string
+}
 
-const initialTables: Table[] = [
-  { id: 1, name: "Calisma Alani 1", status: "occupied", occupiedSince: Date.now() - 45 * 60 * 1000 },
-  { id: 2, name: "Calisma Alani 2", status: "available" },
-  { id: 3, name: "Calisma Alani 3", status: "reserved" },
-  { id: 4, name: "Calisma Alani 4", status: "occupied", occupiedSince: Date.now() - 30 * 60 * 1000 },
-  { id: 5, name: "Calisma Alani 5", status: "available" },
-  { id: 6, name: "Calisma Alani 6", status: "cleaning" },
-  { id: 7, name: "Calisma Alani 7", status: "occupied", occupiedSince: Date.now() - 15 * 60 * 1000 },
-  { id: 8, name: "Calisma Alani 8", status: "reserved" },
-  { id: 9, name: "Calisma Alani 9", status: "available" },
-  { id: 10, name: "Calisma Alani 10", status: "occupied", occupiedSince: Date.now() - 60 * 60 * 1000 },
-  { id: 11, name: "Calisma Alani 11", status: "reserved" },
-  { id: 12, name: "Calisma Alani 12", status: "available" },
-]
+function toStaffMember(row: PersonelApiRow, index: number): StaffMember | null {
+  const fullName = String(row.full_name ?? "").trim()
+  const firstName = String(row.first_name ?? "").trim()
+  const lastName = String(row.last_name ?? "").trim()
+  const name = fullName || `${firstName} ${lastName}`.trim()
+  if (!name) {
+    return null
+  }
+
+  const isActiveValue = row.is_active
+  const isActive =
+    isActiveValue === true ||
+    isActiveValue === 1 ||
+    isActiveValue === "1" ||
+    isActiveValue === "true"
+  if (!isActive) {
+    return null
+  }
+
+  const specialties = String(row.expertise ?? "")
+    .split("|")
+    .map((item) => item.trim())
+    .filter(Boolean)
+
+  return {
+    id: String(row.id ?? `EMP${String(index + 1).padStart(3, "0")}`),
+    name,
+    specialties,
+  }
+}
 
 const statusConfig = {
   available: { color: "bg-green-500", bgColor: "bg-green-100 border-green-300", label: "Musait" },
@@ -79,7 +88,9 @@ interface TablesViewProps {
 }
 
 export function TablesView({ canManage = false }: TablesViewProps) {
-  const [tables, setTables] = useState<Table[]>(initialTables)
+  const { serviceNames: serviceOptions } = useSalonServices()
+  const [tables, setTables] = useState<Table[]>([])
+  const [staffList, setStaffList] = useState<StaffMember[]>([])
   const [now, setNow] = useState(Date.now())
   const [editingTableId, setEditingTableId] = useState<number | null>(null)
   const [editingName, setEditingName] = useState("")
@@ -111,32 +122,45 @@ export function TablesView({ canManage = false }: TablesViewProps) {
     return () => clearInterval(timer)
   }, [])
 
-  useEffect(() => {
-    let cancelled = false
-    const load = async () => {
-      const res = await fetch("/api/workspaces")
-      const json = (await res.json().catch(() => null)) as any
-      if (!res.ok || !json?.ok || !Array.isArray(json?.rows) || cancelled) return
+  const loadWorkspaces = useCallback(async () => {
+    const res = await fetch("/api/workspaces")
+    const json = (await res.json().catch(() => null)) as any
+    if (!res.ok || !json?.ok || !Array.isArray(json?.rows)) {
+      return
+    }
 
-      const mapped: Table[] = json.rows.map((row: any, index: number) => {
-        const statusRaw = String(row.status ?? "available").toLowerCase()
-        const status: Table["status"] =
-          statusRaw === "occupied" || statusRaw === "reserved" || statusRaw === "cleaning"
-            ? statusRaw
-            : "available"
-        return {
-          id: Number(row.id ?? index + 1),
-          name: String(row.table_number ?? row.tableNumber ?? `Calisma Alani ${index + 1}`),
-          status,
-        }
-      })
-      if (mapped.length > 0) setTables(mapped)
-    }
-    load()
-    return () => {
-      cancelled = true
-    }
+    const mapped: Table[] = json.rows.map((row: any, index: number) => {
+      const statusRaw = String(row.status ?? "available").toLowerCase()
+      const status: Table["status"] =
+        statusRaw === "occupied" || statusRaw === "reserved" || statusRaw === "cleaning"
+          ? statusRaw
+          : "available"
+      return {
+        id: Number(row.id ?? index + 1),
+        name: String(row.table_number ?? row.tableNumber ?? `Calisma Alani ${index + 1}`),
+        status,
+      }
+    })
+    setTables(mapped)
   }, [])
+
+  const loadStaff = useCallback(async () => {
+    const res = await fetch("/api/personels", { cache: "no-store" })
+    const json = (await res.json().catch(() => null)) as any
+    if (!res.ok || !json?.ok || !Array.isArray(json?.rows)) {
+      return
+    }
+
+    const mapped = json.rows
+      .map((row: PersonelApiRow, index: number) => toStaffMember(row, index))
+      .filter((row: StaffMember | null): row is StaffMember => row !== null)
+    setStaffList(mapped)
+  }, [])
+
+  useEffect(() => {
+    void loadWorkspaces()
+    void loadStaff()
+  }, [loadWorkspaces, loadStaff])
 
   const handleAddWorkspace = async () => {
     const nextId = tables.length > 0 ? Math.max(...tables.map((t) => t.id)) + 1 : 1
@@ -156,14 +180,7 @@ export function TablesView({ canManage = false }: TablesViewProps) {
       alert(json?.message ?? "Calisma alani eklenemedi.")
       return
     }
-    setTables((prev) => [
-      ...prev,
-      {
-        id: nextId,
-        name: tableName,
-        status: "available",
-      },
-    ])
+    await loadWorkspaces()
   }
 
   const handleSetStatus = async (id: number, status: Table["status"], sessionData?: SessionData) => {

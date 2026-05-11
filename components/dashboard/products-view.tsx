@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -13,6 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { cn } from "@/lib/utils"
+import { getProductCategoryId, getProductCategoryLabel } from "@/lib/product-categories"
 import {
   ChevronLeft,
   ChevronRight,
@@ -32,87 +33,24 @@ import {
   Heart,
 } from "lucide-react"
 
-// Kuafor salonu urun kategorileri
-const categoryCards = [
-  { label: "Sac Bakim", count: 24, icon: Sparkles, color: "bg-purple-500", bgColor: "bg-purple-500/10", textColor: "text-purple-600" },
-  { label: "Sac Boyasi", count: 18, icon: Droplets, color: "bg-pink-500", bgColor: "bg-pink-500/10", textColor: "text-pink-600" },
-  { label: "Styling", count: 12, icon: Scissors, color: "bg-blue-500", bgColor: "bg-blue-500/10", textColor: "text-blue-600" },
-  { label: "Cilt & Makyaj", count: 15, icon: Heart, color: "bg-rose-500", bgColor: "bg-rose-500/10", textColor: "text-rose-600" },
+const categoryVisuals = [
+  { icon: Sparkles, bgColor: "bg-purple-500/10", textColor: "text-purple-600" },
+  { icon: Droplets, bgColor: "bg-pink-500/10", textColor: "text-pink-600" },
+  { icon: Scissors, bgColor: "bg-blue-500/10", textColor: "text-blue-600" },
+  { icon: Heart, bgColor: "bg-rose-500/10", textColor: "text-rose-600" },
 ]
 
-// Kuafor salonu urunleri
-const initialProducts = [
-  {
-    id: "PRD001",
-    name: "Loreal Professionnel Sampuan",
-    description: "Yipranmis saclar icin onarici sampuan 500ml",
-    category: "Sac Bakim",
-    price: "450.00",
-    cost: "280.00",
-    stock: 25,
-    status: "mevcut",
-  },
-  {
-    id: "PRD002",
-    name: "Wella Koleston Boya",
-    description: "Kalici sac boyasi - tum tonlar",
-    category: "Sac Boyasi",
-    price: "320.00",
-    cost: "180.00",
-    stock: 0,
-    status: "stokta yok",
-  },
-  {
-    id: "PRD003",
-    name: "Moroccan Oil Bakim Yagi",
-    description: "Argan yagli sac bakim serumu 100ml",
-    category: "Sac Bakim",
-    price: "680.00",
-    cost: "420.00",
-    stock: 12,
-    status: "mevcut",
-  },
-  {
-    id: "PRD004",
-    name: "Schwarzkopf Sac Spreyi",
-    description: "Guclu tutucu sac spreyi 300ml",
-    category: "Styling",
-    price: "280.00",
-    cost: "150.00",
-    stock: 8,
-    status: "dusuk stok",
-  },
-  {
-    id: "PRD005",
-    name: "Kerastase Sac Maskesi",
-    description: "Yogun nemlendirici maske 200ml",
-    category: "Sac Bakim",
-    price: "890.00",
-    cost: "550.00",
-    stock: 18,
-    status: "mevcut",
-  },
-  {
-    id: "PRD006",
-    name: "MAC Fondoten",
-    description: "Studio Fix Fluid SPF15 30ml",
-    category: "Cilt & Makyaj",
-    price: "1250.00",
-    cost: "780.00",
-    stock: 5,
-    status: "dusuk stok",
-  },
-  {
-    id: "PRD007",
-    name: "Redken Sac Jeli",
-    description: "Islak etkili sac sekillendirici 150ml",
-    category: "Styling",
-    price: "380.00",
-    cost: "220.00",
-    stock: 30,
-    status: "mevcut",
-  },
-]
+interface Product {
+  id: string
+  name: string
+  description: string
+  categoryId: number
+  category: string
+  price: string
+  cost: string
+  stock: number
+  status: string
+}
 
 const statusColors: Record<string, string> = {
   "mevcut": "bg-emerald-500/10 text-emerald-600 border-emerald-200",
@@ -121,23 +59,25 @@ const statusColors: Record<string, string> = {
 }
 
 export function ProductsView() {
-  const [products, setProducts] = useState(initialProducts)
+  const [products, setProducts] = useState<Product[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
 
   // Satis modal state
   const [showSaleModal, setShowSaleModal] = useState(false)
-  const [saleProduct, setSaleProduct] = useState<typeof initialProducts[0] | null>(null)
+  const [saleProduct, setSaleProduct] = useState<Product | null>(null)
   const [saleForm, setSaleForm] = useState({
     customerName: "",
     customerSurname: "",
     quantity: 1,
   })
 
-  const loadProducts = async () => {
+  const loadProducts = useCallback(async () => {
     const res = await fetch(`/api/products?ts=${Date.now()}`, { cache: "no-store" })
     const json = (await res.json().catch(() => null)) as any
-    if (!res.ok || !json?.ok || !Array.isArray(json?.rows)) return false
+    if (!res.ok || !json?.ok || !Array.isArray(json?.rows)) {
+      return false
+    }
 
     const mapped = json.rows.map((row: any, index: number) => {
       const stock = Number(row.stock1 ?? row.stock ?? row.Stock ?? 0)
@@ -148,7 +88,8 @@ export function ProductsView() {
         id: String(row.id ?? `PRD${String(index + 1).padStart(3, "0")}`),
         name: String(row.name ?? "Urun"),
         description: String(row.description ?? "-"),
-        category: String(row.category ?? row.category_name ?? row.categoryName ?? row.categoryId ?? "-"),
+        categoryId: getProductCategoryId(row),
+        category: getProductCategoryLabel(row),
         price: String(row.price ?? "0"),
         cost: String(row.cost ?? row.Cost ?? "0"),
         stock,
@@ -158,22 +99,32 @@ export function ProductsView() {
 
     setProducts(mapped)
     return true
-  }
-
-  useEffect(() => {
-    let cancelled = false
-    const load = async () => {
-      const loaded = await loadProducts()
-      if (cancelled || !loaded) return
-    }
-    load()
-    return () => {
-      cancelled = true
-    }
   }, [])
 
+  useEffect(() => {
+    void loadProducts()
+  }, [loadProducts])
+
+  const categoryCards = useMemo(() => {
+    const counts = new Map<string, number>()
+
+    products.forEach((product) => {
+      const label = String(product.category ?? "").trim() || "-"
+      counts.set(label, (counts.get(label) ?? 0) + 1)
+    })
+
+    return Array.from(counts.entries()).map(([label, count], index) => {
+      const visual = categoryVisuals[index % categoryVisuals.length]
+      return {
+        label,
+        count,
+        ...visual,
+      }
+    })
+  }, [products])
+
   // Satis modalini ac
-  const openSaleModal = (product: typeof initialProducts[0]) => {
+  const openSaleModal = (product: Product) => {
     if (product.stock <= 0) {
       alert("Bu urun stokta yok!")
       return
@@ -222,7 +173,7 @@ export function ProductsView() {
         cost: Number(saleProduct.cost),
         stock: newStock,
         status: newStock <= 0 ? "stokta yok" : newStock <= 10 ? "dusuk stok" : "mevcut",
-        categoryId: 1,
+        categoryId: saleProduct.categoryId,
         isAvailable: newStock > 0,
       }),
     })

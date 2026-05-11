@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useMemo } from "react"
+import { useSalonServices } from "@/hooks/use-salon-services"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -35,20 +36,6 @@ interface Reservation {
   source: "website" | "manual"
   status: "pending" | "confirmed" | "completed" | "cancelled"
 }
-
-// Hizmet secenekleri
-const serviceOptions = [
-  "Sac Kesimi",
-  "Sac Boyama",
-  "Fon",
-  "Manikur",
-  "Pedikur",
-  "Cilt Bakimi",
-  "Makyaj",
-  "Kas Dizayn",
-  "Agda",
-  "Sakal Kesimi",
-]
 
 // Ornek personel listesi
 const staffList = [
@@ -135,6 +122,7 @@ const turkishMonths = [
 const turkishDays = ["Pzr", "Pzt", "Sal", "Car", "Per", "Cum", "Cmt"]
 
 export function ReservationsView() {
+  const { serviceNames: serviceOptions } = useSalonServices()
   const [reservations, setReservations] = useState<Reservation[]>(initialReservations)
   const [currentDate, setCurrentDate] = useState(new Date())
   const [selectedDate, setSelectedDate] = useState<string | null>(null)

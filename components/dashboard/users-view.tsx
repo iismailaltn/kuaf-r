@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
+import { useSalonServices } from "@/hooks/use-salon-services"
 import {
   Search,
   Plus,
@@ -58,19 +59,6 @@ interface PersonelApiRow {
   role?: string
   notes?: string
 }
-
-const specialtyOptions = [
-  "Sac Kesimi",
-  "Sac Boyama",
-  "Fon",
-  "Manikur",
-  "Pedikur",
-  "Cilt Bakimi",
-  "Makyaj",
-  "Kas Dizayn",
-  "Agda",
-  "Sakal Kesimi",
-]
 
 const initialEmployees: EmployeeData[] = [
   {
@@ -172,6 +160,7 @@ function toEmployeeData(row: PersonelApiRow, index: number): EmployeeData {
 }
 
 export function UsersView() {
+  const { serviceNames: specialtyOptions } = useSalonServices()
   const [employees, setEmployees] = useState<EmployeeData[]>(initialEmployees)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)

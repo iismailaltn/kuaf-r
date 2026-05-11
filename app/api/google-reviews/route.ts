@@ -1,0 +1,52 @@
+import { NextResponse } from "next/server"
+import type { AxiosError } from "axios"
+import { appConfig } from "@/app.config"
+import { fetchGooglePlaceReviews } from "@/lib/google-reviews"
+import { normalizeGooglePlaceSettingsRows, type GooglePlaceSettingsRow } from "@/lib/google-place-settings"
+import { selectByToken } from "@/lib/services/locofabric-database"
+
+function extractRows(data: unknown) {
+  if (Array.isArray((data as { data?: unknown })?.data)) {
+    return (data as { data: GooglePlaceSettingsRow[] }).data
+  }
+  if (Array.isArray((data as { Data?: unknown })?.Data)) {
+    return (data as { Data: GooglePlaceSettingsRow[] }).Data
+  }
+  if (Array.isArray(data)) {
+    return data as GooglePlaceSettingsRow[]
+  }
+  return []
+}
+
+export async function GET() {
+  try {
+    const token = appConfig.token.google_place_settings
+    if (!token) {
+      return NextResponse.json({ ok: false, message: "google_place_settings token tanimli degil." }, { status: 500 })
+    }
+
+    const data = await selectByToken<unknown>(token)
+    const settings = normalizeGooglePlaceSettingsRows(extractRows(data))[0] ?? null
+    if (!settings) {
+      return NextResponse.json({ ok: false, message: "Google Places ayarlari bulunamadi." }, { status: 404 })
+    }
+
+    const reviews = await fetchGooglePlaceReviews(settings.placesApiKey, settings.placeId)
+
+    return NextResponse.json({ ok: true, reviews })
+  } catch (err) {
+    const axiosErr = err as AxiosError | undefined
+    const status = (axiosErr as { response?: { status?: number } })?.response?.status
+    const data = (axiosErr as { response?: { data?: unknown } })?.response?.data
+    return NextResponse.json(
+      {
+        ok: false,
+        message: err instanceof Error ? err.message : "Google yorumlari getirilemedi.",
+        error: axiosErr?.message ?? String(err),
+        upstreamStatus: typeof status === "number" ? status : undefined,
+        upstreamData: data,
+      },
+      { status: 502 }
+    )
+  }
+}

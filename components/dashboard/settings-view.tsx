@@ -1,6 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import { useGooglePlaceSettings } from "@/hooks/use-google-place-settings"
+import { useSalonServices } from "@/hooks/use-salon-services"
 import { 
   User, 
   Lock, 
@@ -36,6 +38,8 @@ interface SettingsViewProps {
 type SettingsTab = "profile" | "security" | "google" | "notifications" | "appearance" | "business"
 
 export function SettingsView({ user }: SettingsViewProps) {
+  const { services } = useSalonServices()
+  const { settings: googleSettings, isSaving: isGoogleSaving, saveSettings: saveGoogleSettings } = useGooglePlaceSettings()
   const [activeTab, setActiveTab] = useState<SettingsTab>("profile")
   
   // Profile state
@@ -70,6 +74,7 @@ export function SettingsView({ user }: SettingsViewProps) {
   })
   const [googleConnected, setGoogleConnected] = useState(false)
   const [googleSaved, setGoogleSaved] = useState(false)
+  const [googleError, setGoogleError] = useState("")
 
   // Notifications state
   const [notifications, setNotifications] = useState({
@@ -88,28 +93,54 @@ export function SettingsView({ user }: SettingsViewProps) {
     language: "tr"
   })
 
-  // Business services state
-  const ALL_SERVICES = [
-    { id: "sac-kesimi", label: "Saç Kesimi" },
-    { id: "sac-boyama", label: "Saç Boyama" },
-    { id: "fon", label: "Fon" },
-    { id: "manikur", label: "Manikür" },
-    { id: "pedikur", label: "Pedikür" },
-    { id: "cilt-bakimi", label: "Cilt Bakımı" },
-    { id: "makyaj", label: "Makyaj" },
-    { id: "kas-dizayn", label: "Kaş Dizayn" },
-    { id: "agda", label: "Ağda" },
-    { id: "sakal-kesimi", label: "Sakal Kesimi" },
-  ]
+  const allServices = services.map((service) => ({
+    id: String(service.id),
+    label: service.name,
+  }))
   // "idle" = not selected | "editing" = selected, price input open | "saved" = price confirmed (green)
-  const [serviceStates, setServiceStates] = useState<Record<string, "idle" | "editing" | "saved">>({
-    "sac-kesimi": "saved",
-    "sakal-kesimi": "saved",
-  })
-  const [servicePrices, setServicePrices] = useState<Record<string, string>>({
-    "sac-kesimi": "50",
-    "sakal-kesimi": "30",
-  })
+  const [serviceStates, setServiceStates] = useState<Record<string, "idle" | "editing" | "saved">>({})
+  const [servicePrices, setServicePrices] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    if (!googleSettings) {
+      return
+    }
+
+    setGoogleData({
+      apiKey: googleSettings.placesApiKey,
+      placeId: googleSettings.placeId,
+    })
+    setGoogleConnected(true)
+  }, [googleSettings])
+
+  useEffect(() => {
+    if (!services.length) {
+      return
+    }
+
+    const nextStates: Record<string, "idle" | "editing" | "saved"> = {}
+    const nextPrices: Record<string, string> = {}
+
+    services.forEach((service) => {
+      const serviceId = String(service.id)
+
+      if (!service.isActive) {
+        nextStates[serviceId] = "idle"
+        return
+      }
+
+      if (service.price > 0) {
+        nextStates[serviceId] = "saved"
+        nextPrices[serviceId] = String(service.price)
+        return
+      }
+
+      nextStates[serviceId] = "editing"
+    })
+
+    setServiceStates(nextStates)
+    setServicePrices(nextPrices)
+  }, [services])
   // derived helper
   const selectedServices = Object.entries(serviceStates)
     .filter(([, s]) => s !== "idle")
@@ -125,13 +156,48 @@ export function SettingsView({ user }: SettingsViewProps) {
     })
   }
 
-  const handleServiceSave = (id: string) => {
-    setServiceStates(prev => ({ ...prev, [id]: "saved" }))
+  const handleServiceSave = async (id: string) => {
+    const service = services.find((item) => String(item.id) === id)
+    if (!service) {
+      return
+    }
+
+    const price = Number(servicePrices[id] ?? 0)
+    const res = await fetch(`/api/salon-services/${service.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ price, isActive: true }),
+    })
+    const data = await res.json().catch(() => null)
+    if (!res.ok || !data?.ok) {
+      return
+    }
+
+    setServiceStates((prev) => ({ ...prev, [id]: "saved" }))
   }
 
-  const handleServiceRemove = (id: string) => {
-    setServiceStates(prev => ({ ...prev, [id]: "idle" }))
-    setServicePrices(prev => { const next = { ...prev }; delete next[id]; return next })
+  const handleServiceRemove = async (id: string) => {
+    const service = services.find((item) => String(item.id) === id)
+    if (!service) {
+      return
+    }
+
+    const res = await fetch(`/api/salon-services/${service.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ price: 0, isActive: false }),
+    })
+    const data = await res.json().catch(() => null)
+    if (!res.ok || !data?.ok) {
+      return
+    }
+
+    setServiceStates((prev) => ({ ...prev, [id]: "idle" }))
+    setServicePrices((prev) => {
+      const next = { ...prev }
+      delete next[id]
+      return next
+    })
   }
 
   const updateServicePrice = (id: string, price: string) => {
@@ -174,17 +240,27 @@ export function SettingsView({ user }: SettingsViewProps) {
     setTimeout(() => setPasswordSuccess(false), 3000)
   }
 
-  const handleGoogleSave = () => {
-    if (googleData.apiKey && googleData.placeId) {
-      setGoogleConnected(true)
-      setGoogleSaved(true)
-      setTimeout(() => setGoogleSaved(false), 3000)
+  const handleGoogleSave = async () => {
+    if (!googleData.apiKey || !googleData.placeId) {
+      return
     }
+
+    const result = await saveGoogleSettings(googleData.apiKey, googleData.placeId)
+    if (!result.ok) {
+      setGoogleError(result.message)
+      return
+    }
+
+    setGoogleError("")
+    setGoogleConnected(true)
+    setGoogleSaved(true)
+    setTimeout(() => setGoogleSaved(false), 3000)
   }
 
   const handleGoogleDisconnect = () => {
     setGoogleConnected(false)
     setGoogleData({ apiKey: "", placeId: "" })
+    setGoogleError("")
   }
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -211,11 +287,11 @@ export function SettingsView({ user }: SettingsViewProps) {
         <h4 className="text-xs font-semibold text-foreground mb-3">
           Yapilacak Islemler
           <span className="ml-2 font-normal text-muted-foreground">
-            ({selectedServices.length}/{ALL_SERVICES.length} secildi)
+            ({selectedServices.length}/{allServices.length} secildi)
           </span>
         </h4>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-          {ALL_SERVICES.map((service) => {
+          {allServices.map((service) => {
             const state = serviceStates[service.id] ?? "idle"
             const price = servicePrices[service.id] || ""
 
@@ -638,6 +714,13 @@ export function SettingsView({ user }: SettingsViewProps) {
         </div>
       </div>
 
+      {googleError && (
+        <div className="flex items-center gap-2 p-4 bg-destructive/10 border border-destructive/20 rounded-lg max-w-lg">
+          <AlertCircle className="w-5 h-5 text-destructive" />
+          <p className="text-sm text-destructive">{googleError}</p>
+        </div>
+      )}
+
       {/* API Form */}
       <div className="space-y-4 max-w-lg">
         <div>
@@ -672,8 +755,8 @@ export function SettingsView({ user }: SettingsViewProps) {
 
         <div className="flex items-center gap-3 pt-2">
           <button
-            onClick={handleGoogleSave}
-            disabled={!googleData.apiKey || !googleData.placeId}
+            onClick={() => void handleGoogleSave()}
+            disabled={!googleData.apiKey || !googleData.placeId || isGoogleSaving}
             className="flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Save className="w-4 h-4" />
