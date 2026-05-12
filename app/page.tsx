@@ -13,6 +13,7 @@ import { RegisterForm } from "@/components/auth/register-form"
 import { UsersView } from "@/components/dashboard/users-view"
 import { ReservationsView } from "@/components/dashboard/reservations-view"
 import { PerformanceView } from "@/components/dashboard/performance-view"
+import { OperationsView } from "@/components/dashboard/operations-view"
 import { ReviewsView } from "@/components/dashboard/reviews-view"
 import { MyReservationsView } from "@/components/dashboard/my-reservations-view"
 import { SettingsView } from "@/components/dashboard/settings-view"
@@ -122,6 +123,8 @@ export default function Dashboard() {
         return <ReservationsView />
       case "performance":
         return <PerformanceView />
+      case "operations":
+        return <OperationsView />
       case "reviews":
         return <ReviewsView />
       case "my-reservations":

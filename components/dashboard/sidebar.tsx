@@ -15,6 +15,7 @@ import {
   CalendarCheck2,
   BarChart3,
   Star,
+  ClipboardList,
 } from "lucide-react"
 import { useState } from "react"
 
@@ -29,6 +30,7 @@ export type ViewType =
   | "reservations"
   | "my-reservations"
   | "performance"
+  | "operations"
   | "customers"
   | "reviews"
   | "settings"
@@ -51,6 +53,7 @@ const navItemsByRole: Record<UserRole, Array<{ id: ViewType; icon: any; label: s
     { id: "users", icon: Users, label: "Kullanicilar" },
     { id: "reservations", icon: CalendarCheck2, label: "Rezervasyonlar" },
     { id: "performance", icon: BarChart3, label: "Performans" },
+    { id: "operations", icon: ClipboardList, label: "Islemler" },
     { id: "inventory", icon: Box, label: "Stok" },
     { id: "settings", icon: Settings, label: "Ayarlar" },
   ],
@@ -71,7 +74,7 @@ const navItemsByRole: Record<UserRole, Array<{ id: ViewType; icon: any; label: s
 export function Sidebar({ activeView, onViewChange, onLogout, shopName = "Kuaför", role = "user" }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false)
   const navItems = navItemsByRole[role] ?? navItemsByRole.user
-  const adminSectionIds: ViewType[] = ["users", "reservations", "performance", "inventory"]
+  const adminSectionIds: ViewType[] = ["users", "reservations", "performance", "operations", "inventory"]
   const mainNavItems = role === "admin" ? navItems.filter((item) => !adminSectionIds.includes(item.id)) : navItems
   const adminNavItems = role === "admin" ? navItems.filter((item) => adminSectionIds.includes(item.id)) : []
 

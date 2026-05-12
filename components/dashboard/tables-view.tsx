@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 import { useSalonServices } from "@/hooks/use-salon-services"
+import type { SalonService } from "@/lib/salon-services"
 import { 
   Plus, Users, Clock, Scissors, X, Pencil, Trash2, Save, MapPin, 
   User, FileText, Camera, Upload, Instagram, Globe, Play, CheckCircle 
@@ -83,12 +84,17 @@ const statusConfig = {
   cleaning: { color: "bg-orange-500", bgColor: "bg-orange-100 border-orange-300", label: "Temizleniyor" },
 }
 
+function getDefaultServicePrice(serviceName: string, services: SalonService[]) {
+  const match = services.find((service) => service.name === serviceName)
+  return match?.price ?? 0
+}
+
 interface TablesViewProps {
   canManage?: boolean
 }
 
 export function TablesView({ canManage = false }: TablesViewProps) {
-  const { serviceNames: serviceOptions } = useSalonServices()
+  const { serviceNames: serviceOptions, activeServices } = useSalonServices()
   const [tables, setTables] = useState<Table[]>([])
   const [staffList, setStaffList] = useState<StaffMember[]>([])
   const [now, setNow] = useState(Date.now())
@@ -112,6 +118,7 @@ export function TablesView({ canManage = false }: TablesViewProps) {
   const [sessionPhoto, setSessionPhoto] = useState<string | null>(null)
   const [shareOnInstagram, setShareOnInstagram] = useState(false)
   const [shareOnWebsite, setShareOnWebsite] = useState(false)
+  const [sessionServicePrices, setSessionServicePrices] = useState<Record<string, string>>({})
   const fileInputRef = useRef<HTMLInputElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
   const [isCameraActive, setIsCameraActive] = useState(false)
@@ -282,10 +289,19 @@ export function TablesView({ canManage = false }: TablesViewProps) {
 
   // Open end session modal
   const openEndSessionModal = (tableId: number) => {
+    const currentTable = tables.find((table) => table.id === tableId)
+    const selectedServices = currentTable?.sessionData?.services ?? []
+    const initialPrices: Record<string, string> = {}
+
+    selectedServices.forEach((service) => {
+      initialPrices[service] = String(getDefaultServicePrice(service, activeServices))
+    })
+
     setEndSessionTableId(tableId)
     setSessionPhoto(null)
     setShareOnInstagram(false)
     setShareOnWebsite(false)
+    setSessionServicePrices(initialPrices)
     setShowEndSessionModal(true)
   }
 
@@ -297,6 +313,7 @@ export function TablesView({ canManage = false }: TablesViewProps) {
     setSessionPhoto(null)
     setShareOnInstagram(false)
     setShareOnWebsite(false)
+    setSessionServicePrices({})
   }
 
   // Handle photo upload
@@ -352,15 +369,56 @@ export function TablesView({ canManage = false }: TablesViewProps) {
   }
 
   // End session
-  const handleEndSession = () => {
+  const handleEndSession = async () => {
     if (!endSessionTableId) return
-    
-    // TODO: Burada paylaşım işlemleri yapılabilir
-    if (shareOnInstagram && sessionPhoto) {
-      console.log("Instagram'da paylasilacak")
+
+    const currentTable = tables.find((table) => table.id === endSessionTableId)
+    const sessionData = currentTable?.sessionData
+    if (!sessionData) {
+      alert("Seans bilgisi bulunamadi.")
+      return
     }
-    if (shareOnWebsite && sessionPhoto) {
-      console.log("Web sitesinde paylasilacak")
+
+    const serviceItems = sessionData.services.map((service) => {
+      const price = Number(sessionServicePrices[service] ?? "")
+      if (!Number.isFinite(price) || price < 0) {
+        return null
+      }
+
+      return {
+        name: service,
+        price,
+      }
+    })
+
+    if (serviceItems.some((item) => item === null)) {
+      alert("Lutfen tum hizmetler icin gecerli bir fiyat girin.")
+      return
+    }
+
+    const res = await fetch("/api/session-operations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        workspaceId: endSessionTableId,
+        workspaceName: currentTable?.name ?? "",
+        customerName: sessionData.customerName,
+        customerSurname: sessionData.customerSurname,
+        serviceItems: serviceItems.filter((item): item is { name: string; price: number } => item !== null),
+        staffId: sessionData.staffId,
+        staffName: sessionData.staffName,
+        notes: sessionData.notes,
+        photo: sessionPhoto,
+        shareOnInstagram,
+        shareOnWebsite,
+        startedAt: sessionData.startTime,
+        endedAt: Date.now(),
+      }),
+    })
+    const json = (await res.json().catch(() => null)) as any
+    if (!res.ok || !json?.ok) {
+      alert(json?.message ?? "Islem kaydi olusturulamadi.")
+      return
     }
 
     handleSetStatus(endSessionTableId, "cleaning")
@@ -863,6 +921,52 @@ export function TablesView({ canManage = false }: TablesViewProps) {
 
               {/* Content */}
               <div className="p-6 space-y-6">
+                {currentTable?.sessionData && currentTable.sessionData.services.length > 0 && (
+                  <div className="space-y-4">
+                    <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                      <Scissors className="w-4 h-4" />
+                      Hizmet Fiyatlari
+                    </h3>
+                    <div className="space-y-3">
+                      {currentTable.sessionData.services.map((service) => (
+                        <div key={service} className="flex items-center justify-between gap-3 p-3 rounded-xl bg-muted/50">
+                          <span className="text-sm font-medium text-foreground">{service}</span>
+                          <div className="flex items-center gap-2">
+                            <Input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={sessionServicePrices[service] ?? ""}
+                              onChange={(event) =>
+                                setSessionServicePrices((prev) => ({
+                                  ...prev,
+                                  [service]: event.target.value,
+                                }))
+                              }
+                              className="w-28 rounded-xl h-10 text-right"
+                            />
+                            <span className="text-sm text-muted-foreground">TL</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-emerald-700">Toplam Tutar</span>
+                        <span className="text-xl font-bold text-emerald-600">
+                          {currentTable.sessionData.services
+                            .reduce((total, service) => {
+                              const price = Number(sessionServicePrices[service] ?? 0)
+                              return total + (Number.isFinite(price) ? price : 0)
+                            }, 0)
+                            .toFixed(2)}{" "}
+                          TL
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Photo Section */}
                 <div className="space-y-4">
                   <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
