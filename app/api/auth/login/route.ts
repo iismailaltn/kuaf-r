@@ -71,10 +71,10 @@ export async function POST(req: Request) {
       )
     }
 
-    const token = appConfig.token.user
+    const token = appConfig.token.users
     if (!token) {
       return NextResponse.json(
-        { ok: false, message: "user token tanimli degil." },
+        { ok: false, message: "users token tanimli degil." },
         { status: 500 }
       )
     }
@@ -134,9 +134,22 @@ export async function POST(req: Request) {
     if ("password_hash" in row) delete row.password_hash
     if ("passwordHash" in row) delete row.passwordHash
 
+    const userId = String(getField(row, ["id", "ID", "user_id", "userId"]) ?? "").trim()
+    const accountType = String(getField(row, ["account_type", "accountType"]) ?? "").trim().toLowerCase()
+    let staffAccepted = false
+    if (userId && accountType === "bireysel" && appConfig.token.personel_invitations) {
+      const invitationData = await selectByToken<any>(appConfig.token.personel_invitations)
+      const invitations = extractRows(invitationData)
+      staffAccepted = invitations.some((invitation) => {
+        const individualUserId = String(getField(invitation, ["individual_user_id", "individualUserId"]) ?? "").trim()
+        const status = String(getField(invitation, ["status"]) ?? "").trim().toLowerCase()
+        return individualUserId === userId && status === "accepted"
+      })
+    }
+
     return NextResponse.json({
       ok: true,
-      user: row,
+      user: { ...row, staffAccepted },
     })
   } catch (err) {
     const axiosErr = err as AxiosError | undefined

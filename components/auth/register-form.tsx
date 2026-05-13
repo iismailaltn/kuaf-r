@@ -5,6 +5,15 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { cn } from "@/lib/utils"
+import { useSalonServices } from "@/hooks/use-salon-services"
+import {
   Eye,
   EyeOff,
   Mail,
@@ -13,29 +22,51 @@ import {
   Building2,
   Phone,
   UtensilsCrossed,
+  Star,
 } from "lucide-react"
 import Link from "next/link"
 
+type RegisterAccountType = "personel" | "customer"
+
 interface RegisterFormProps {
   onRegister: (data: {
+    accountType: RegisterAccountType
     shopName: string
     ownerName: string
+    firstName?: string
+    lastName?: string
+    taxOffice?: string
+    taxNumber?: string
     email: string
     phone: string
     password: string
+    specialty?: string[]
+    workingHours?: string
+    startDate?: string
+    status?: "aktif" | "pasif"
+    experience?: string
+    notes?: string
   }) => Promise<void> | void
   onSwitchToLogin: () => void
 }
 
 export function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFormProps) {
+  const { serviceNames: specialtyOptions } = useSalonServices()
+  const [accountType, setAccountType] = useState<RegisterAccountType>("personel")
   const [formData, setFormData] = useState({
     shopName: "",
     ownerName: "",
+    firstName: "",
+    lastName: "",
+    taxOffice: "",
+    taxNumber: "",
     email: "",
     phone: "",
     password: "",
     confirmPassword: "",
+    experience: "",
   })
+  const [specialty, setSpecialty] = useState<string[]>([])
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [agreeTerms, setAgreeTerms] = useState(false)
@@ -43,6 +74,14 @@ export function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFormProps)
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value })
+  }
+
+  const toggleSpecialty = (spec: string) => {
+    setSpecialty((current) =>
+      current.includes(spec)
+        ? current.filter((item) => item !== spec)
+        : [...current, spec]
+    )
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -54,11 +93,18 @@ export function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFormProps)
     setIsLoading(true)
     await new Promise((resolve) => setTimeout(resolve, 1000))
     onRegister({
+      accountType,
       shopName: formData.shopName,
-      ownerName: formData.ownerName,
+      ownerName: `${formData.firstName} ${formData.lastName}`.trim() || formData.ownerName,
+      firstName: formData.firstName,
+      lastName: formData.lastName,
+      taxOffice: formData.taxOffice,
+      taxNumber: formData.taxNumber,
       email: formData.email,
       phone: formData.phone,
       password: formData.password,
+      specialty,
+      experience: formData.experience,
     })
     setIsLoading(false)
   }
@@ -98,7 +144,7 @@ export function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFormProps)
 
       {/* Right side - Register form */}
       <div className="flex-1 flex items-center justify-center p-8 bg-background overflow-y-auto">
-        <div className="w-full max-w-md">
+        <div className={cn("w-full", accountType === "personel" ? "max-w-2xl" : "max-w-md")}>
           {/* Mobile logo */}
           <div className="lg:hidden flex justify-center mb-6">
             <div className="w-14 h-14 bg-primary rounded-2xl flex items-center justify-center">
@@ -113,42 +159,204 @@ export function RegisterForm({ onRegister, onSwitchToLogin }: RegisterFormProps)
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground">
-                Kuaför adı
-              </label>
-              <div className="relative">
-                <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                <Input
-                  type="text"
-                  name="shopName"
-                  placeholder="Kuaför adını gir"
-                  value={formData.shopName}
-                  onChange={handleChange}
-                  className="pl-10 h-12 rounded-xl bg-muted/50 border-border"
-                  required
-                />
-              </div>
-            </div>
+          <div className="grid grid-cols-2 gap-3 mb-6">
+            <Button
+              type="button"
+              variant={accountType === "personel" ? "default" : "outline"}
+              className="h-11 rounded-xl"
+              onClick={() => setAccountType("personel")}
+            >
+              Bireysel
+            </Button>
+            <Button
+              type="button"
+              variant={accountType === "customer" ? "default" : "outline"}
+              className="h-11 rounded-xl"
+              onClick={() => setAccountType("customer")}
+            >
+              Kurumsal
+            </Button>
+          </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground">
-                İşletme sahibi
-              </label>
-              <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                <Input
-                  type="text"
-                  name="ownerName"
-                  placeholder="Ad soyad"
-                  value={formData.ownerName}
-                  onChange={handleChange}
-                  className="pl-10 h-12 rounded-xl bg-muted/50 border-border"
-                  required
-                />
-              </div>
-            </div>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {accountType === "customer" ? (
+              <>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">
+                    İşletme adı
+                  </label>
+                  <div className="relative">
+                    <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                    <Input
+                      type="text"
+                      name="shopName"
+                      placeholder="İşletme adını gir"
+                      value={formData.shopName}
+                      onChange={handleChange}
+                      className="pl-10 h-12 rounded-xl bg-muted/50 border-border"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">
+                      İşletme sahibi adı
+                    </label>
+                    <div className="relative">
+                      <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                      <Input
+                        type="text"
+                        name="firstName"
+                        placeholder="Ad"
+                        value={formData.firstName}
+                        onChange={handleChange}
+                        className="pl-10 h-12 rounded-xl bg-muted/50 border-border"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">
+                      İşletme sahibi soyadı
+                    </label>
+                    <div className="relative">
+                      <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                      <Input
+                        type="text"
+                        name="lastName"
+                        placeholder="Soyad"
+                        value={formData.lastName}
+                        onChange={handleChange}
+                        className="pl-10 h-12 rounded-xl bg-muted/50 border-border"
+                        required
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">
+                      Vergi dairesi
+                    </label>
+                    <Input
+                      type="text"
+                      name="taxOffice"
+                      placeholder="Vergi dairesi"
+                      value={formData.taxOffice}
+                      onChange={handleChange}
+                      className="h-12 rounded-xl bg-muted/50 border-border"
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">
+                      Vergi numarası
+                    </label>
+                    <Input
+                      type="text"
+                      name="taxNumber"
+                      placeholder="Vergi numarası"
+                      value={formData.taxNumber}
+                      onChange={handleChange}
+                      className="h-12 rounded-xl bg-muted/50 border-border"
+                      required
+                    />
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">
+                      Ad
+                    </label>
+                    <div className="relative">
+                      <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                      <Input
+                        type="text"
+                        name="firstName"
+                        placeholder="Ornek: Ahmet"
+                        value={formData.firstName}
+                        onChange={handleChange}
+                        className="pl-10 h-12 rounded-xl bg-muted/50 border-border"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">
+                      Soyad
+                    </label>
+                    <div className="relative">
+                      <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                      <Input
+                        type="text"
+                        name="lastName"
+                        placeholder="Ornek: Yilmaz"
+                        value={formData.lastName}
+                        onChange={handleChange}
+                        className="pl-10 h-12 rounded-xl bg-muted/50 border-border"
+                        required
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">
+                    Deneyim
+                  </label>
+                  <div className="relative max-w-40">
+                    <Star className="absolute left-3 top-1/2 -translate-y-1/2 z-10 w-5 h-5 text-muted-foreground" />
+                    <Select
+                      value={formData.experience}
+                      onValueChange={(value) => setFormData({ ...formData, experience: value })}
+                    >
+                      <SelectTrigger className="pl-10 h-12 rounded-xl bg-muted/50 border-border">
+                        <SelectValue placeholder="Yıl" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Array.from({ length: 31 }, (_, index) => (
+                          <SelectItem key={index} value={String(index)}>
+                            {index} yıl
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">
+                    Uzmanlık Alanları
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {specialtyOptions.map((spec) => (
+                      <button
+                        key={spec}
+                        type="button"
+                        onClick={() => toggleSpecialty(spec)}
+                        className={cn(
+                          "px-4 py-2 rounded-xl text-sm font-medium transition-all",
+                          specialty.includes(spec)
+                            ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25"
+                            : "bg-muted hover:bg-muted/80 text-muted-foreground"
+                        )}
+                      >
+                        {spec}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">

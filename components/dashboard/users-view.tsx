@@ -19,6 +19,7 @@ import {
   Plus,
   MoreHorizontal,
   Phone,
+  Mail,
   Edit3,
   Trash2,
   X,
@@ -31,6 +32,7 @@ import {
   Briefcase,
   Star,
   Save,
+  CheckCircle2,
 } from "lucide-react"
 
 interface EmployeeData {
@@ -59,6 +61,18 @@ interface PersonelApiRow {
   role?: string
   notes?: string
 }
+
+interface IndividualLookupResult {
+  userId: string
+  firstName: string
+  lastName: string
+  email: string
+  phone: string
+  experienceYears: string
+  expertise: string[]
+}
+
+type InviteStep = "search" | "preview" | "invited"
 
 const initialEmployees: EmployeeData[] = [
   {
@@ -159,7 +173,12 @@ function toEmployeeData(row: PersonelApiRow, index: number): EmployeeData {
   }
 }
 
-export function UsersView() {
+interface UsersViewProps {
+  businessUserId?: string
+  businessUsername?: string
+}
+
+export function UsersView({ businessUserId, businessUsername }: UsersViewProps) {
   const { serviceNames: specialtyOptions } = useSalonServices()
   const [employees, setEmployees] = useState<EmployeeData[]>(initialEmployees)
   const [isLoading, setIsLoading] = useState(true)
@@ -170,6 +189,14 @@ export function UsersView() {
   const [showAddModal, setShowAddModal] = useState(false)
   const [editingEmployee, setEditingEmployee] = useState<EmployeeData | null>(null)
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  const [inviteStep, setInviteStep] = useState<InviteStep>("search")
+  const [isSearchingIndividual, setIsSearchingIndividual] = useState(false)
+  const [inviteSearch, setInviteSearch] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+  })
+  const [matchedIndividual, setMatchedIndividual] = useState<IndividualLookupResult | null>(null)
 
   const [formData, setFormData] = useState({
     name: "",
@@ -257,6 +284,84 @@ export function UsersView() {
     }
   }
 
+  const resetInviteFlow = () => {
+    setInviteStep("search")
+    setInviteSearch({
+      firstName: "",
+      lastName: "",
+      email: "",
+    })
+    setMatchedIndividual(null)
+    setIsSearchingIndividual(false)
+  }
+
+  const closeEmployeeModal = () => {
+    setShowAddModal(false)
+    setEditingEmployee(null)
+    resetForm()
+    resetInviteFlow()
+  }
+
+  const handleFindIndividual = async () => {
+    if (!inviteSearch.firstName.trim() || !inviteSearch.lastName.trim() || !inviteSearch.email.trim()) {
+      alert("Lutfen ad, soyad ve e-posta alanlarini doldurun.")
+      return
+    }
+
+    try {
+      setIsSearchingIndividual(true)
+      const res = await fetch("/api/individual-lookup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(inviteSearch),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok || !data?.ok || !data?.user) {
+        alert(data?.message ?? "Eslesen bireysel kullanici bulunamadi.")
+        return
+      }
+
+      setMatchedIndividual(data.user)
+      setInviteStep("preview")
+    } finally {
+      setIsSearchingIndividual(false)
+    }
+  }
+
+  const handleInviteIndividual = async () => {
+    if (!businessUserId && !businessUsername) {
+      alert("Isletme kullanici bilgisi bulunamadi.")
+      return
+    }
+
+    if (!matchedIndividual?.userId) {
+      alert("Davet edilecek bireysel kullanici bulunamadi.")
+      return
+    }
+
+    try {
+      setIsSaving(true)
+      const res = await fetch("/api/personel-invitations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "create",
+          businessUserId,
+          businessUsername,
+          individualUserId: matchedIndividual.userId,
+        }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok || !data?.ok) {
+        alert(data?.message ?? "Davet gonderilemedi.")
+        return
+      }
+      setInviteStep("invited")
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
   const handleEditEmployee = () => {
     if (!editingEmployee || !formData.name || !formData.phone) {
       alert("Lutfen zorunlu alanlari doldurun.")
@@ -281,6 +386,7 @@ export function UsersView() {
   }
 
   const openEditModal = (employee: EmployeeData) => {
+    resetInviteFlow()
     setEditingEmployee(employee)
     setFormData({
       name: employee.name,
@@ -334,7 +440,13 @@ export function UsersView() {
             Kuafor salonu calisanlarini yonetin
           </p>
         </div>
-        <Button className="rounded-xl gap-2" onClick={() => setShowAddModal(true)}>
+        <Button
+          className="rounded-xl gap-2"
+          onClick={() => {
+            resetInviteFlow()
+            setShowAddModal(true)
+          }}
+        >
           <Plus className="w-4 h-4" />
           Calisan Ekle
         </Button>
@@ -550,19 +662,15 @@ export function UsersView() {
                   </div>
                   <div>
                     <h2 className="text-xl font-semibold text-foreground">
-                      {editingEmployee ? "Calisan Duzenle" : "Yeni Calisan"}
+                      {editingEmployee ? "Calisan Duzenle" : "Yeni Personel Daveti"}
                     </h2>
                     <p className="text-sm text-muted-foreground">
-                      {editingEmployee ? "Calisan bilgilerini guncelleyin" : "Salona yeni calisan ekleyin"}
+                      {editingEmployee ? "Calisan bilgilerini guncelleyin" : "Bireysel hesabi olan personeli davet edin"}
                     </p>
                   </div>
                 </div>
                 <button
-                  onClick={() => {
-                    setShowAddModal(false)
-                    setEditingEmployee(null)
-                    resetForm()
-                  }}
+                  onClick={closeEmployeeModal}
                   className="p-2 rounded-xl hover:bg-muted transition-colors"
                 >
                   <X className="w-5 h-5 text-muted-foreground" />
@@ -572,143 +680,315 @@ export function UsersView() {
 
             {/* Form */}
             <div className="p-6 space-y-6">
-              {/* Basic Info */}
-              <div className="space-y-4">
-                <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
-                  Temel Bilgiler
-                </h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-foreground">Ad Soyad *</label>
-                    <Input
-                      placeholder="Ornek: Ahmet Yilmaz"
-                      value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      className="rounded-xl h-11"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-foreground">Telefon *</label>
-                    <Input
-                      placeholder="+90 555 000 0000"
-                      value={formData.phone}
-                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                      className="rounded-xl h-11"
-                    />
-                  </div>
-                </div>
-              </div>
+              {showAddModal && !editingEmployee ? (
+                <>
+                  {inviteStep === "search" && (
+                    <div className="space-y-5">
+                      <div>
+                        <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+                          Bireysel Kullanici Ara
+                        </h3>
+                        <p className="text-sm text-muted-foreground mt-2">
+                          Personelin bireysel hesabinda kayitli ad, soyad ve e-posta bilgisini girin.
+                        </p>
+                      </div>
 
-              {/* Work Info */}
-              <div className="space-y-4">
-                <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
-                  Calisma Bilgileri
-                </h3>
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-foreground">Calisma Saatleri</label>
-                    <Input
-                      placeholder="09:00 - 18:00"
-                      value={formData.workingHours}
-                      onChange={(e) => setFormData({ ...formData, workingHours: e.target.value })}
-                      className="rounded-xl h-11"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-foreground">Deneyim</label>
-                    <Input
-                      placeholder="3 yil"
-                      value={formData.experience}
-                      onChange={(e) => setFormData({ ...formData, experience: e.target.value })}
-                      className="rounded-xl h-11"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-foreground">Baslangic Tarihi</label>
-                    <Input
-                      type="date"
-                      value={formData.startDate}
-                      onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                      className="rounded-xl h-11"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground">Durum</label>
-                  <Select
-                    value={formData.status}
-                    onValueChange={(value: "aktif" | "pasif") =>
-                      setFormData({ ...formData, status: value })
-                    }
-                  >
-                    <SelectTrigger className="rounded-xl h-11 w-40">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="aktif">Aktif</SelectItem>
-                      <SelectItem value="pasif">Pasif</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-foreground">Ad *</label>
+                          <Input
+                            placeholder="Ornek: Ahmet"
+                            value={inviteSearch.firstName}
+                            onChange={(e) => setInviteSearch({ ...inviteSearch, firstName: e.target.value })}
+                            className="rounded-xl h-11"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-foreground">Soyad *</label>
+                          <Input
+                            placeholder="Ornek: Yilmaz"
+                            value={inviteSearch.lastName}
+                            onChange={(e) => setInviteSearch({ ...inviteSearch, lastName: e.target.value })}
+                            className="rounded-xl h-11"
+                          />
+                        </div>
+                      </div>
 
-              {/* Specialties */}
-              <div className="space-y-4">
-                <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
-                  Uzmanlik Alanlari
-                </h3>
-                <div className="flex flex-wrap gap-2">
-                  {specialtyOptions.map((spec) => (
-                    <button
-                      key={spec}
-                      type="button"
-                      onClick={() => toggleSpecialty(spec)}
-                      className={cn(
-                        "px-4 py-2 rounded-xl text-sm font-medium transition-all",
-                        formData.specialty.includes(spec)
-                          ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25"
-                          : "bg-muted hover:bg-muted/80 text-muted-foreground"
-                      )}
-                    >
-                      {spec}
-                    </button>
-                  ))}
-                </div>
-              </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-foreground">E-posta *</label>
+                        <div className="relative">
+                          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                          <Input
+                            type="email"
+                            placeholder="personel@ornek.com"
+                            value={inviteSearch.email}
+                            onChange={(e) => setInviteSearch({ ...inviteSearch, email: e.target.value })}
+                            className="pl-9 rounded-xl h-11"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
-              {/* Notes */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">Notlar</label>
-                <Textarea
-                  placeholder="Calisan hakkinda ek bilgiler..."
-                  value={formData.notes}
-                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  className="rounded-xl min-h-24 resize-none"
-                />
-              </div>
+                  {inviteStep === "preview" && matchedIndividual && (
+                    <div className="space-y-5">
+                      <div>
+                        <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+                          Eslesen Bireysel Kullanici
+                        </h3>
+                        <p className="text-sm text-muted-foreground mt-2">
+                          Bilgiler dogruysa personele davet gonderebilirsiniz.
+                        </p>
+                      </div>
+
+                      <div className="rounded-2xl border border-border bg-muted/30 p-5 space-y-4">
+                        <div>
+                          <p className="text-xl font-semibold text-foreground">
+                            {matchedIndividual.firstName} {matchedIndividual.lastName}
+                          </p>
+                          <div className="flex flex-wrap gap-4 mt-2 text-sm text-muted-foreground">
+                            <span className="flex items-center gap-1.5">
+                              <Mail className="w-4 h-4" />
+                              {matchedIndividual.email}
+                            </span>
+                            <span className="flex items-center gap-1.5">
+                              <Phone className="w-4 h-4" />
+                              {matchedIndividual.phone || "Telefon yok"}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-border">
+                          <div>
+                            <p className="text-xs text-muted-foreground">Deneyim</p>
+                            <p className="font-medium text-foreground">
+                              {matchedIndividual.experienceYears ? `${matchedIndividual.experienceYears} yil` : "Belirtilmemis"}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">Uzmanlik Alanlari</p>
+                            <div className="flex flex-wrap gap-1.5 mt-1">
+                              {matchedIndividual.expertise.length > 0 ? matchedIndividual.expertise.map((spec) => (
+                                <Badge key={spec} variant="outline" className="rounded-lg">
+                                  {spec}
+                                </Badge>
+                              )) : (
+                                <p className="font-medium text-foreground">Belirtilmemis</p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {inviteStep === "invited" && (
+                    <div className="py-8 text-center space-y-5">
+                      <div className="mx-auto w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center">
+                        <CheckCircle2 className="w-8 h-8 text-primary" />
+                      </div>
+                      <div className="space-y-2">
+                        <h3 className="text-xl font-semibold text-foreground">
+                          İşletmenize yeni personel eklediğiniz için bu mutluluğu beraber yaşıyoruz.
+                        </h3>
+                        <p className="text-muted-foreground">
+                          Lütfen personelin bu daveti kabul etmesini bekleyin.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  {/* Basic Info */}
+                  <div className="space-y-4">
+                    <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+                      Temel Bilgiler
+                    </h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-foreground">Ad Soyad *</label>
+                        <Input
+                          placeholder="Ornek: Ahmet Yilmaz"
+                          value={formData.name}
+                          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                          className="rounded-xl h-11"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-foreground">Telefon *</label>
+                        <Input
+                          placeholder="+90 555 000 0000"
+                          value={formData.phone}
+                          onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                          className="rounded-xl h-11"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Work Info */}
+                  <div className="space-y-4">
+                    <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+                      Calisma Bilgileri
+                    </h3>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-foreground">Calisma Saatleri</label>
+                        <Input
+                          placeholder="09:00 - 18:00"
+                          value={formData.workingHours}
+                          onChange={(e) => setFormData({ ...formData, workingHours: e.target.value })}
+                          className="rounded-xl h-11"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-foreground">Deneyim</label>
+                        <Input
+                          placeholder="3 yil"
+                          value={formData.experience}
+                          onChange={(e) => setFormData({ ...formData, experience: e.target.value })}
+                          className="rounded-xl h-11"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-foreground">Baslangic Tarihi</label>
+                        <Input
+                          type="date"
+                          value={formData.startDate}
+                          onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                          className="rounded-xl h-11"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-foreground">Durum</label>
+                      <Select
+                        value={formData.status}
+                        onValueChange={(value: "aktif" | "pasif") =>
+                          setFormData({ ...formData, status: value })
+                        }
+                      >
+                        <SelectTrigger className="rounded-xl h-11 w-40">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="aktif">Aktif</SelectItem>
+                          <SelectItem value="pasif">Pasif</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  {/* Specialties */}
+                  <div className="space-y-4">
+                    <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+                      Uzmanlik Alanlari
+                    </h3>
+                    <div className="flex flex-wrap gap-2">
+                      {specialtyOptions.map((spec) => (
+                        <button
+                          key={spec}
+                          type="button"
+                          onClick={() => toggleSpecialty(spec)}
+                          className={cn(
+                            "px-4 py-2 rounded-xl text-sm font-medium transition-all",
+                            formData.specialty.includes(spec)
+                              ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25"
+                              : "bg-muted hover:bg-muted/80 text-muted-foreground"
+                          )}
+                        >
+                          {spec}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Notes */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">Notlar</label>
+                    <Textarea
+                      placeholder="Calisan hakkinda ek bilgiler..."
+                      value={formData.notes}
+                      onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                      className="rounded-xl min-h-24 resize-none"
+                    />
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Footer */}
             <div className="sticky bottom-0 px-6 py-4 border-t border-border bg-card/80 backdrop-blur-sm flex items-center justify-end gap-3">
-              <Button
-                variant="outline"
-                className="rounded-xl h-11 px-6"
-                onClick={() => {
-                  setShowAddModal(false)
-                  setEditingEmployee(null)
-                  resetForm()
-                }}
-              >
-                Vazgec
-              </Button>
-              <Button
-                className="rounded-xl h-11 px-6 gap-2 shadow-lg shadow-primary/25"
-                onClick={editingEmployee ? handleEditEmployee : handleAddEmployee}
-                disabled={isSaving}
-              >
-                <Save className="w-4 h-4" />
-                {editingEmployee ? "Guncelle" : isSaving ? "Ekleniyor..." : "Calisan Ekle"}
-              </Button>
+              {showAddModal && !editingEmployee ? (
+                <>
+                  {inviteStep !== "invited" && (
+                    <Button
+                      variant="outline"
+                      className="rounded-xl h-11 px-6"
+                      onClick={closeEmployeeModal}
+                    >
+                      Vazgec
+                    </Button>
+                  )}
+                  {inviteStep === "search" && (
+                    <Button
+                      className="rounded-xl h-11 px-6 gap-2 shadow-lg shadow-primary/25"
+                      onClick={handleFindIndividual}
+                      disabled={isSearchingIndividual}
+                    >
+                      {isSearchingIndividual ? "Araniyor..." : "Devam Et"}
+                    </Button>
+                  )}
+                  {inviteStep === "preview" && (
+                    <>
+                      <Button
+                        variant="outline"
+                        className="rounded-xl h-11 px-6"
+                        onClick={() => {
+                          setInviteStep("search")
+                          setMatchedIndividual(null)
+                        }}
+                      >
+                        Geri
+                      </Button>
+                      <Button
+                        className="rounded-xl h-11 px-6 gap-2 shadow-lg shadow-primary/25"
+                        onClick={handleInviteIndividual}
+                        disabled={isSaving}
+                      >
+                        {isSaving ? "Davet gonderiliyor..." : "Davet Et"}
+                      </Button>
+                    </>
+                  )}
+                  {inviteStep === "invited" && (
+                    <Button
+                      className="rounded-xl h-11 px-6 gap-2 shadow-lg shadow-primary/25"
+                      onClick={closeEmployeeModal}
+                    >
+                      Bitir
+                    </Button>
+                  )}
+                </>
+              ) : (
+                <>
+                  <Button
+                    variant="outline"
+                    className="rounded-xl h-11 px-6"
+                    onClick={closeEmployeeModal}
+                  >
+                    Vazgec
+                  </Button>
+                  <Button
+                    className="rounded-xl h-11 px-6 gap-2 shadow-lg shadow-primary/25"
+                    onClick={handleEditEmployee}
+                    disabled={isSaving}
+                  >
+                    <Save className="w-4 h-4" />
+                    Guncelle
+                  </Button>
+                </>
+              )}
             </div>
           </div>
         </div>

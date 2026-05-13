@@ -41,6 +41,7 @@ interface SidebarProps {
   onLogout: () => void
   shopName?: string
   role?: UserRole
+  hideNavigation?: boolean
 }
 
 const navItemsByRole: Record<UserRole, Array<{ id: ViewType; icon: any; label: string }>> = {
@@ -71,7 +72,7 @@ const navItemsByRole: Record<UserRole, Array<{ id: ViewType; icon: any; label: s
   ],
 }
 
-export function Sidebar({ activeView, onViewChange, onLogout, shopName = "Kuaför", role = "user" }: SidebarProps) {
+export function Sidebar({ activeView, onViewChange, onLogout, shopName = "Kuaför", role = "user", hideNavigation = false }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false)
   const navItems = navItemsByRole[role] ?? navItemsByRole.user
   const adminSectionIds: ViewType[] = ["users", "reservations", "performance", "operations", "inventory"]
@@ -118,55 +119,59 @@ export function Sidebar({ activeView, onViewChange, onLogout, shopName = "Kuafö
       )}
 
       <nav className="flex-1 p-3 space-y-1">
-        {mainNavItems.map((item) => {
-          const isActive = item.id === activeView
-          const Icon = item.icon
+        {!hideNavigation && (
+          <>
+            {mainNavItems.map((item) => {
+              const isActive = item.id === activeView
+              const Icon = item.icon
 
-          return (
-            <button
-              key={item.id}
-              onClick={() => onViewChange(item.id)}
-              className={cn(
-                "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all",
-                isActive
-                  ? "bg-primary text-primary-foreground shadow-md"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
-              )}
-            >
-              <Icon className="w-5 h-5 shrink-0" />
-              {!collapsed && (
-                <span className="text-sm font-medium">{item.label}</span>
-              )}
-            </button>
-          )
-        })}
-        {role === "admin" && !collapsed && (
-          <div className="px-3 pt-3 pb-1 text-xs font-semibold tracking-wide text-muted-foreground/80">
-            Admin
-          </div>
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => onViewChange(item.id)}
+                  className={cn(
+                    "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all",
+                    isActive
+                      ? "bg-primary text-primary-foreground shadow-md"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  )}
+                >
+                  <Icon className="w-5 h-5 shrink-0" />
+                  {!collapsed && (
+                    <span className="text-sm font-medium">{item.label}</span>
+                  )}
+                </button>
+              )
+            })}
+            {role === "admin" && !collapsed && (
+              <div className="px-3 pt-3 pb-1 text-xs font-semibold tracking-wide text-muted-foreground/80">
+                Admin
+              </div>
+            )}
+            {adminNavItems.map((item) => {
+              const isActive = item.id === activeView
+              const Icon = item.icon
+
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => onViewChange(item.id)}
+                  className={cn(
+                    "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all",
+                    isActive
+                      ? "bg-primary text-primary-foreground shadow-md"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  )}
+                >
+                  <Icon className="w-5 h-5 shrink-0" />
+                  {!collapsed && (
+                    <span className="text-sm font-medium">{item.label}</span>
+                  )}
+                </button>
+              )
+            })}
+          </>
         )}
-        {adminNavItems.map((item) => {
-          const isActive = item.id === activeView
-          const Icon = item.icon
-
-          return (
-            <button
-              key={item.id}
-              onClick={() => onViewChange(item.id)}
-              className={cn(
-                "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all",
-                isActive
-                  ? "bg-primary text-primary-foreground shadow-md"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
-              )}
-            >
-              <Icon className="w-5 h-5 shrink-0" />
-              {!collapsed && (
-                <span className="text-sm font-medium">{item.label}</span>
-              )}
-            </button>
-          )
-        })}
       </nav>
 
       <div className="p-3 border-t border-border">
