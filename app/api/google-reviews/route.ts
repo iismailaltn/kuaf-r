@@ -4,6 +4,7 @@ import { appConfig } from "@/app.config"
 import { fetchGooglePlaceReviews } from "@/lib/google-reviews"
 import { normalizeGooglePlaceSettingsRows, type GooglePlaceSettingsRow } from "@/lib/google-place-settings"
 import { selectByToken } from "@/lib/services/locofabric-database"
+import { getBusinessUserIdFromRequest, matchesBusinessUserId, requireBusinessUserId } from "@/lib/business-scope"
 
 function extractRows(data: unknown) {
   if (Array.isArray((data as { data?: unknown })?.data)) {
@@ -18,15 +19,20 @@ function extractRows(data: unknown) {
   return []
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
+    const businessUserId = getBusinessUserIdFromRequest(req)
+    const businessError = requireBusinessUserId(businessUserId)
+    if (businessError) {
+      return NextResponse.json({ ok: false, message: businessError }, { status: 400 })
+    }
     const token = appConfig.token.google_place_settings
     if (!token) {
       return NextResponse.json({ ok: false, message: "google_place_settings token tanimli degil." }, { status: 500 })
     }
 
     const data = await selectByToken<unknown>(token)
-    const settings = normalizeGooglePlaceSettingsRows(extractRows(data))[0] ?? null
+    const settings = normalizeGooglePlaceSettingsRows(extractRows(data).filter((row) => matchesBusinessUserId(row, businessUserId)))[0] ?? null
     if (!settings) {
       return NextResponse.json({ ok: false, message: "Google Places ayarlari bulunamadi." }, { status: 404 })
     }

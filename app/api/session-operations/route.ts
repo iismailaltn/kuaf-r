@@ -10,6 +10,7 @@ import {
   type SessionOperationItemRow,
   type SessionOperationRow,
 } from "@/lib/session-operations"
+import { getBusinessUserIdFromBody, getBusinessUserIdFromRequest, matchesBusinessUserId, requireBusinessUserId } from "@/lib/business-scope"
 
 function sanitizeSqlString(input: string) {
   return input.replace(/'/g, "''")
@@ -43,8 +44,16 @@ function sqlNullableString(value: string | null | undefined) {
   return normalized ? `'${sanitizeSqlString(normalized)}'` : "NULL"
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
+    const url = new URL(req.url)
+    const businessUserId = getBusinessUserIdFromRequest(req)
+    const staffId = url.searchParams.get("staffId")?.trim() ?? ""
+    const businessError = requireBusinessUserId(businessUserId)
+    if (businessError) {
+      return NextResponse.json({ ok: false, message: businessError }, { status: 400 })
+    }
+
     const operationsToken = appConfig.token.session_operations
     const itemsToken = appConfig.token.session_operation_items
     if (!operationsToken) {
@@ -62,9 +71,9 @@ export async function GET() {
       extractRows<SessionOperationItemRow>(itemsData)
     )
     const rows = normalizeSessionOperationRows(
-      extractRows<SessionOperationRow>(operationsData),
+      extractRows<SessionOperationRow>(operationsData).filter((row) => matchesBusinessUserId(row, businessUserId)),
       itemsByOperationId
-    )
+    ).filter((row) => !staffId || row.staffId === staffId)
 
     return NextResponse.json({ ok: true, rows })
   } catch (err) {
@@ -98,6 +107,7 @@ export async function POST(req: Request) {
     const body = (await req.json().catch(() => null)) as
       | {
           workspaceId?: number | string
+          businessUserId?: string | number
           workspaceName?: string
           customerName?: string
           customerSurname?: string
@@ -113,6 +123,12 @@ export async function POST(req: Request) {
           endedAt?: number | string
         }
       | null
+
+    const businessUserId = getBusinessUserIdFromBody(body)
+    const businessError = requireBusinessUserId(businessUserId)
+    if (businessError) {
+      return NextResponse.json({ ok: false, message: businessError }, { status: 400 })
+    }
 
     const customerNameRaw = String(body?.customerName ?? "").trim()
     const customerSurnameRaw = String(body?.customerSurname ?? "").trim()
@@ -175,11 +191,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, message: "Gecersiz seans zamani." }, { status: 400 })
     }
 
-    const insertSql = `INSERT INTO session_operations (workspace_id, workspace_name, customer_name, customer_surname, services, staff_id, staff_name, notes, photo, share_on_instagram, share_on_website, started_at, ended_at, createdAt, updatedAt) VALUES (${workspaceId ?? "NULL"}, '${workspaceName}', '${customerName}', '${customerSurname}', '${servicesValue}', '${staffId}', '${staffName}', ${notesValue}, ${photoValue}, ${shareOnInstagram}, ${shareOnWebsite}, '${startedAt}', '${endedAt}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+    const insertSql = `INSERT INTO session_operations (business_user_id, workspace_id, workspace_name, customer_name, customer_surname, services, staff_id, staff_name, notes, photo, share_on_instagram, share_on_website, started_at, ended_at, createdAt, updatedAt) VALUES (${businessUserId}, ${workspaceId ?? "NULL"}, '${workspaceName}', '${customerName}', '${customerSurname}', '${servicesValue}', '${staffId}', '${staffName}', ${notesValue}, ${photoValue}, ${shareOnInstagram}, ${shareOnWebsite}, '${startedAt}', '${endedAt}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
     await sqlToken(operationsToken, insertSql)
 
     const refreshedOperations = await selectByToken<unknown>(operationsToken)
-    const sessionOperationId = resolveSessionOperationId(extractRows<SessionOperationRow>(refreshedOperations), {
+    const sessionOperationId = resolveSessionOperationId(extractRows<SessionOperationRow>(refreshedOperations).filter((row) => matchesBusinessUserId(row, businessUserId)), {
       customerName: customerNameRaw,
       customerSurname: customerSurnameRaw,
       workspaceName: workspaceNameRaw,
@@ -194,7 +210,7 @@ export async function POST(req: Request) {
 
     for (const item of serviceItems) {
       const serviceName = sanitizeSqlString(item.name)
-      const itemSql = `INSERT INTO session_operation_items (session_operation_id, service_name, price, createdAt, updatedAt) VALUES (${sessionOperationId}, '${serviceName}', ${item.price}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+      const itemSql = `INSERT INTO session_operation_items (business_user_id, session_operation_id, service_name, price, createdAt, updatedAt) VALUES (${businessUserId}, ${sessionOperationId}, '${serviceName}', ${item.price}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
       await sqlToken(itemsToken, itemSql)
     }
 

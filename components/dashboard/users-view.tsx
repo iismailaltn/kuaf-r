@@ -74,64 +74,6 @@ interface IndividualLookupResult {
 
 type InviteStep = "search" | "preview" | "invited"
 
-const initialEmployees: EmployeeData[] = [
-  {
-    id: "EMP001",
-    name: "Ahmet Yilmaz",
-    phone: "+90 555 123 4567",
-    specialty: ["Sac Kesimi", "Sakal Kesimi"],
-    workingHours: "09:00 - 18:00",
-    startDate: "2022-01-15",
-    status: "aktif",
-    experience: "5 yil",
-    notes: "Uzman berber, erkek sac kesiminde deneyimli",
-  },
-  {
-    id: "EMP002",
-    name: "Ayse Kaya",
-    phone: "+90 555 234 5678",
-    specialty: ["Sac Boyama", "Fon", "Makyaj"],
-    workingHours: "10:00 - 19:00",
-    startDate: "2023-03-20",
-    status: "aktif",
-    experience: "3 yil",
-    notes: "Renklendirme uzmani",
-  },
-  {
-    id: "EMP003",
-    name: "Mehmet Demir",
-    phone: "+90 555 345 6789",
-    specialty: ["Sac Kesimi", "Sac Boyama"],
-    workingHours: "09:00 - 18:00",
-    startDate: "2024-01-10",
-    status: "aktif",
-    experience: "1 yil",
-    notes: "",
-  },
-  {
-    id: "EMP004",
-    name: "Fatma Celik",
-    phone: "+90 555 456 7890",
-    specialty: ["Manikur", "Pedikur", "Cilt Bakimi"],
-    workingHours: "10:00 - 18:00",
-    startDate: "2023-06-01",
-    status: "pasif",
-    experience: "4 yil",
-    notes: "Izinli - 15 Ocak'a kadar",
-  },
-  {
-    id: "EMP005",
-    name: "Ali Ozturk",
-    phone: "+90 555 567 8901",
-    specialty: ["Kas Dizayn", "Agda"],
-    workingHours: "11:00 - 20:00",
-    startDate: "2024-02-15",
-    status: "aktif",
-    experience: "2 yil",
-    notes: "",
-  },
-]
-
 const statusConfig = {
   aktif: {
     label: "Aktif",
@@ -179,8 +121,8 @@ interface UsersViewProps {
 }
 
 export function UsersView({ businessUserId, businessUsername }: UsersViewProps) {
-  const { serviceNames: specialtyOptions } = useSalonServices()
-  const [employees, setEmployees] = useState<EmployeeData[]>(initialEmployees)
+  const { serviceNames: specialtyOptions } = useSalonServices(businessUserId)
+  const [employees, setEmployees] = useState<EmployeeData[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
@@ -213,7 +155,8 @@ export function UsersView({ businessUserId, businessUsername }: UsersViewProps) 
     const loadEmployees = async () => {
       try {
         setIsLoading(true)
-        const res = await fetch("/api/personels", { cache: "no-store" })
+        if (!businessUserId) return
+        const res = await fetch(`/api/personels?businessUserId=${encodeURIComponent(businessUserId)}`, { cache: "no-store" })
         const data = await res.json().catch(() => null)
         if (!res.ok || !data?.ok || !Array.isArray(data?.rows)) {
           return
@@ -221,14 +164,14 @@ export function UsersView({ businessUserId, businessUsername }: UsersViewProps) 
         const mapped = data.rows.map((row: PersonelApiRow, index: number) => toEmployeeData(row, index))
         setEmployees(mapped)
       } catch {
-        // UI fallback: keep existing local list if API fails.
+        setEmployees([])
       } finally {
         setIsLoading(false)
       }
     }
 
     void loadEmployees()
-  }, [])
+  }, [businessUserId])
 
   const filteredEmployees = employees.filter((employee) => {
     const matchesSearch =
@@ -255,6 +198,7 @@ export function UsersView({ businessUserId, businessUsername }: UsersViewProps) 
       setIsSaving(true)
       const payload = {
         ...formData,
+        businessUserId,
         startDate: formData.startDate || new Date().toISOString().split("T")[0],
       }
       const res = await fetch("/api/personels", {
@@ -268,7 +212,7 @@ export function UsersView({ businessUserId, businessUsername }: UsersViewProps) 
         return
       }
 
-      const listRes = await fetch("/api/personels", { cache: "no-store" })
+      const listRes = await fetch(`/api/personels?businessUserId=${encodeURIComponent(businessUserId ?? "")}`, { cache: "no-store" })
       const listData = await listRes.json().catch(() => null)
       if (listRes.ok && listData?.ok && Array.isArray(listData?.rows)) {
         const mapped = listData.rows.map((row: PersonelApiRow, index: number) => toEmployeeData(row, index))

@@ -34,6 +34,7 @@ interface User {
   accountType: string
   isActive: boolean
   staffAccepted: boolean
+  businessUserId: string
 }
 
 export default function Dashboard() {
@@ -46,7 +47,7 @@ export default function Dashboard() {
   const handleLogin = async (emailOrUsername: string, password: string) => {
     const loginId = emailOrUsername.trim().toLowerCase()
     if (loginId === "admin" && password === "admin") {
-      setUser({ id: "", email: "admin", shopName: "admin", role: "admin", accountType: "admin", isActive: true, staffAccepted: false })
+      setUser({ id: "", email: "admin", shopName: "admin", role: "admin", accountType: "admin", isActive: true, staffAccepted: false, businessUserId: "" })
       setAuthState("authenticated")
       setActiveView("dashboard")
       return
@@ -65,6 +66,7 @@ export default function Dashboard() {
         accountType: authUser.accountType,
         isActive: authUser.isActive,
         staffAccepted: authUser.staffAccepted,
+        businessUserId: authUser.businessUserId,
       })
       setAuthState("authenticated")
       setActiveView("dashboard")
@@ -102,6 +104,7 @@ export default function Dashboard() {
         accountType: authUser.accountType,
         isActive: authUser.isActive,
         staffAccepted: authUser.staffAccepted,
+        businessUserId: authUser.businessUserId,
       })
       setAuthState("authenticated")
       setActiveView("dashboard")
@@ -136,9 +139,11 @@ export default function Dashboard() {
     )
   }
 
+  const scopedBusinessUserId = user?.businessUserId || (user?.accountType === "kurumsal" ? user.id : "")
+
   const renderView = () => {
     if (user?.role === "user" && user.accountType === "bireysel" && !user.staffAccepted) {
-      return <IndividualInvitationsView userId={user.id} onAccepted={() => setUser({ ...user, staffAccepted: true })} />
+      return <IndividualInvitationsView userId={user.id} onAccepted={(businessUserId) => setUser({ ...user, staffAccepted: true, businessUserId })} />
     }
 
     if (user?.role === "user" && user.accountType === "kurumsal" && !user.isActive) {
@@ -178,23 +183,36 @@ export default function Dashboard() {
       case "orders":
         return <OrdersView />
       case "tables":
-        return <TablesView canManage={user?.role === "admin"} />
+        return (
+          <TablesView
+            canManage={user?.role === "admin"}
+            businessUserId={scopedBusinessUserId}
+            currentUserId={user?.id}
+            currentAccountType={user?.accountType}
+          />
+        )
       case "products":
-        return <ProductsView />
+        return <ProductsView businessUserId={scopedBusinessUserId} />
       case "inventory":
-        return <InventoryView />
+        return <InventoryView businessUserId={scopedBusinessUserId} />
       case "settings":
-        return <SettingsView user={user ? { email: user.email, shopName: user.shopName, role: user.role } : undefined} />
+        return <SettingsView user={user ? { email: user.email, shopName: user.shopName, role: user.role, businessUserId: scopedBusinessUserId } : undefined} />
       case "users":
-        return <UsersView businessUserId={user?.id} businessUsername={user?.email} />
+        return <UsersView businessUserId={scopedBusinessUserId} businessUsername={user?.email} />
       case "reservations":
-        return <ReservationsView />
+        return <ReservationsView businessUserId={scopedBusinessUserId} />
       case "performance":
         return <PerformanceView />
       case "operations":
-        return <OperationsView />
+        return (
+          <OperationsView
+            businessUserId={scopedBusinessUserId}
+            currentUserId={user?.id}
+            currentAccountType={user?.accountType}
+          />
+        )
       case "reviews":
-        return <ReviewsView />
+        return <ReviewsView businessUserId={scopedBusinessUserId} />
       case "my-reservations":
         return <MyReservationsView staffName={user?.shopName} />
       case "customers":
@@ -314,7 +332,7 @@ interface IndividualInvitationRow {
   businessName: string
 }
 
-function IndividualInvitationsView({ userId, onAccepted }: { userId: string; onAccepted: () => void }) {
+function IndividualInvitationsView({ userId, onAccepted }: { userId: string; onAccepted: (businessUserId: string) => void }) {
   const [rows, setRows] = useState<IndividualInvitationRow[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isAcceptingId, setIsAcceptingId] = useState<string | null>(null)
@@ -358,7 +376,7 @@ function IndividualInvitationsView({ userId, onAccepted }: { userId: string; onA
 
       setRows((current) => current.filter((row) => row.id !== invitationId))
       setAcceptedMessage("Davet kabul edildi. Artık işletmenin personel listesine eklendiniz.")
-      onAccepted()
+      onAccepted(String(data.businessUserId ?? ""))
     } finally {
       setIsAcceptingId(null)
     }

@@ -181,7 +181,7 @@ export async function POST(req: Request) {
 
       await sqlToken(
         appConfig.token.personels,
-        `INSERT INTO personels (first_name, last_name, full_name, phone, email, role, expertise, is_active, hire_date) VALUES (${sqlString(firstName)}, ${lastName ? sqlString(lastName) : "NULL"}, ${sqlString(fullName)}, ${phone ? sqlString(phone) : "NULL"}, ${email ? sqlString(email) : "NULL"}, ${experienceYears ? sqlString(`${experienceYears} yil`) : "NULL"}, ${expertise ? sqlString(expertise) : "NULL"}, 1, ${sqlString(hireDate)})`
+        `INSERT INTO personels (business_user_id, first_name, last_name, full_name, phone, email, role, expertise, is_active, hire_date) VALUES (${String(getField(invitation, ["business_user_id", "businessUserId"]) ?? "").trim()}, ${sqlString(firstName)}, ${lastName ? sqlString(lastName) : "NULL"}, ${sqlString(fullName)}, ${phone ? sqlString(phone) : "NULL"}, ${email ? sqlString(email) : "NULL"}, ${experienceYears ? sqlString(`${experienceYears} yil`) : "NULL"}, ${expertise ? sqlString(expertise) : "NULL"}, 1, ${sqlString(hireDate)})`
       )
 
       await sqlToken(
@@ -189,7 +189,10 @@ export async function POST(req: Request) {
         `UPDATE personel_invitations SET status = 'accepted', accepted_at = ${sqlString(new Date().toISOString())} WHERE id = ${invitationId}`
       )
 
-      return NextResponse.json({ ok: true })
+      return NextResponse.json({
+        ok: true,
+        businessUserId: String(getField(invitation, ["business_user_id", "businessUserId"]) ?? "").trim(),
+      })
     }
 
     return NextResponse.json({ ok: false, message: "Gecersiz davet islemi." }, { status: 400 })

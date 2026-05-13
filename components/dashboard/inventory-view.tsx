@@ -140,7 +140,11 @@ const statusColors: Record<string, string> = {
 
 const categoryOptions = productCategoryOptions
 
-export function InventoryView() {
+interface InventoryViewProps {
+  businessUserId?: string
+}
+
+export function InventoryView({ businessUserId }: InventoryViewProps) {
   const [inventory, setInventory] = useState(initialInventory)
   const [searchQuery, setSearchQuery] = useState("")
   const [showAddModal, setShowAddModal] = useState(false)
@@ -170,7 +174,8 @@ export function InventoryView() {
   })
 
   const loadProducts = async () => {
-    const res = await fetch(`/api/products?ts=${Date.now()}`, { cache: "no-store" })
+    if (!businessUserId) return false
+    const res = await fetch(`/api/products?businessUserId=${encodeURIComponent(businessUserId)}&ts=${Date.now()}`, { cache: "no-store" })
     const json = (await res.json().catch(() => null)) as any
     if (!res.ok || !json?.ok || !Array.isArray(json?.rows)) return false
 
@@ -248,6 +253,7 @@ export function InventoryView() {
         status: stock <= 0 ? "stokta yok" : stock <= minStock ? "dusuk stok" : "mevcut",
         categoryId: Number(category),
         isAvailable: true,
+        businessUserId,
       }),
     })
     const json = (await res.json().catch(() => null)) as any
@@ -328,6 +334,7 @@ export function InventoryView() {
         status: stock <= 0 ? "stokta yok" : stock <= minStock ? "dusuk stok" : "mevcut",
         categoryId: Number.isFinite(categoryId) && categoryId > 0 ? categoryId : 1,
         isAvailable: stock > 0,
+        businessUserId,
       }),
     })
 
@@ -359,7 +366,7 @@ export function InventoryView() {
   }
 
   const handleRemoveProduct = async (productId: string) => {
-    const res = await fetch(`/api/products/${productId}`, { method: "DELETE" })
+    const res = await fetch(`/api/products/${productId}?businessUserId=${encodeURIComponent(businessUserId ?? "")}`, { method: "DELETE" })
     const json = (await res.json().catch(() => null)) as any
     if (!res.ok || !json?.ok) {
       // API basarisiz olsa bile local olarak sil

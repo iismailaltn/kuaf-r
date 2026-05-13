@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import type { GooglePlaceSettings } from "@/lib/google-place-settings"
 
-export function useGooglePlaceSettings() {
+export function useGooglePlaceSettings(businessUserId?: string) {
   const [settings, setSettings] = useState<GooglePlaceSettings | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
@@ -11,7 +11,11 @@ export function useGooglePlaceSettings() {
   const loadSettings = useCallback(async () => {
     try {
       setIsLoading(true)
-      const res = await fetch("/api/google-place-settings", { cache: "no-store" })
+      if (!businessUserId) {
+        setSettings(null)
+        return null
+      }
+      const res = await fetch(`/api/google-place-settings?businessUserId=${encodeURIComponent(businessUserId)}`, { cache: "no-store" })
       const data = await res.json().catch(() => null)
       if (!res.ok || !data?.ok) {
         setSettings(null)
@@ -27,7 +31,7 @@ export function useGooglePlaceSettings() {
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [businessUserId])
 
   useEffect(() => {
     void loadSettings()
@@ -39,7 +43,7 @@ export function useGooglePlaceSettings() {
       const res = await fetch("/api/google-place-settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ placesApiKey, placeId }),
+        body: JSON.stringify({ businessUserId, placesApiKey, placeId }),
       })
       const data = await res.json().catch(() => null)
       if (!res.ok || !data?.ok) {
@@ -54,7 +58,7 @@ export function useGooglePlaceSettings() {
     } finally {
       setIsSaving(false)
     }
-  }, [])
+  }, [businessUserId])
 
   return {
     settings,

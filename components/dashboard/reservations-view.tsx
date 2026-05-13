@@ -121,8 +121,12 @@ const turkishMonths = [
 
 const turkishDays = ["Pzr", "Pzt", "Sal", "Car", "Per", "Cum", "Cmt"]
 
-export function ReservationsView() {
-  const { serviceNames: serviceOptions } = useSalonServices()
+interface ReservationsViewProps {
+  businessUserId?: string
+}
+
+export function ReservationsView({ businessUserId }: ReservationsViewProps) {
+  const { serviceNames: serviceOptions } = useSalonServices(businessUserId)
   const [reservations, setReservations] = useState<Reservation[]>(initialReservations)
   const [currentDate, setCurrentDate] = useState(new Date())
   const [selectedDate, setSelectedDate] = useState<string | null>(null)

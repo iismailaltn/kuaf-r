@@ -58,7 +58,11 @@ const statusColors: Record<string, string> = {
   "dusuk stok": "bg-amber-500/10 text-amber-600 border-amber-200",
 }
 
-export function ProductsView() {
+interface ProductsViewProps {
+  businessUserId?: string
+}
+
+export function ProductsView({ businessUserId }: ProductsViewProps) {
   const [products, setProducts] = useState<Product[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
@@ -73,7 +77,8 @@ export function ProductsView() {
   })
 
   const loadProducts = useCallback(async () => {
-    const res = await fetch(`/api/products?ts=${Date.now()}`, { cache: "no-store" })
+    if (!businessUserId) return false
+    const res = await fetch(`/api/products?businessUserId=${encodeURIComponent(businessUserId)}&ts=${Date.now()}`, { cache: "no-store" })
     const json = (await res.json().catch(() => null)) as any
     if (!res.ok || !json?.ok || !Array.isArray(json?.rows)) {
       return false
@@ -99,7 +104,7 @@ export function ProductsView() {
 
     setProducts(mapped)
     return true
-  }, [])
+  }, [businessUserId])
 
   useEffect(() => {
     void loadProducts()
@@ -175,6 +180,7 @@ export function ProductsView() {
         status: newStock <= 0 ? "stokta yok" : newStock <= 10 ? "dusuk stok" : "mevcut",
         categoryId: saleProduct.categoryId,
         isAvailable: newStock > 0,
+        businessUserId,
       }),
     })
 

@@ -2,13 +2,20 @@ import { NextResponse } from "next/server"
 import { appConfig } from "@/app.config"
 import { selectByToken, sqlToken } from "@/lib/services/locofabric-database"
 import type { AxiosError } from "axios"
+import { getBusinessUserIdFromBody, getBusinessUserIdFromRequest, matchesBusinessUserId, requireBusinessUserId } from "@/lib/business-scope"
 
 function sanitizeSqlString(input: string) {
   return input.replace(/'/g, "''")
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
+    const businessUserId = getBusinessUserIdFromRequest(req)
+    const businessError = requireBusinessUserId(businessUserId)
+    if (businessError) {
+      return NextResponse.json({ ok: false, message: businessError }, { status: 400 })
+    }
+
     const token = appConfig.token.Urünler
     if (!token) {
       return NextResponse.json({ ok: false, message: "Urunler token tanimli degil." }, { status: 500 })
@@ -21,7 +28,7 @@ export async function GET() {
       Array.isArray(data) ? data :
       []
 
-    return NextResponse.json({ ok: true, rows })
+    return NextResponse.json({ ok: true, rows: rows.filter((row: any) => matchesBusinessUserId(row, businessUserId)) })
   } catch (err) {
     const axiosErr = err as AxiosError | undefined
     const status = (axiosErr as any)?.response?.status
@@ -48,6 +55,7 @@ export async function POST(req: Request) {
 
     const body = (await req.json().catch(() => null)) as
       | {
+          businessUserId?: string | number
           name?: string
           description?: string
           price?: number | string
@@ -58,6 +66,12 @@ export async function POST(req: Request) {
           isAvailable?: boolean
         }
       | null
+
+    const businessUserId = getBusinessUserIdFromBody(body)
+    const businessError = requireBusinessUserId(businessUserId)
+    if (businessError) {
+      return NextResponse.json({ ok: false, message: businessError }, { status: 400 })
+    }
 
     const name = sanitizeSqlString(String(body?.name ?? "").trim())
     if (!name) {
@@ -78,11 +92,11 @@ export async function POST(req: Request) {
     const categoryId = Number.isFinite(categoryIdRaw) && categoryIdRaw > 0 ? categoryIdRaw : 1
     const isAvailable = body?.isAvailable === false ? 0 : 1
 
-    const insertSql = `INSERT INTO menu_items (categoryId, name, description, price, cost, stock1, status, isAvailable, imageUrl, preparationTimeMinutes, createdAt, updatedAt) VALUES (${categoryId}, '${name}', ${description ? `'${description}'` : "NULL"}, ${price}, ${cost}, ${stock}, '${status}', ${isAvailable}, NULL, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+    const insertSql = `INSERT INTO menu_items (business_user_id, categoryId, name, description, price, cost, stock1, status, isAvailable, imageUrl, preparationTimeMinutes, createdAt, updatedAt) VALUES (${businessUserId}, ${categoryId}, '${name}', ${description ? `'${description}'` : "NULL"}, ${price}, ${cost}, ${stock}, '${status}', ${isAvailable}, NULL, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
     await sqlToken(token, insertSql)
 
     // Some environments apply defaults during insert; force-write editable fields right after insert.
-    const updateSql = `UPDATE menu_items SET cost=${cost}, stock1=${stock}, status='${status}', updatedAt=CURRENT_TIMESTAMP WHERE name='${name}' AND categoryId=${categoryId}`
+    const updateSql = `UPDATE menu_items SET cost=${cost}, stock1=${stock}, status='${status}', updatedAt=CURRENT_TIMESTAMP WHERE name='${name}' AND categoryId=${categoryId} AND business_user_id=${businessUserId}`
     await sqlToken(token, updateSql)
 
     return NextResponse.json({ ok: true })

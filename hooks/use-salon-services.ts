@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import type { SalonService } from "@/lib/salon-services"
 
-export function useSalonServices() {
+export function useSalonServices(businessUserId?: string) {
   const [services, setServices] = useState<SalonService[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
@@ -13,7 +13,8 @@ export function useSalonServices() {
     const loadServices = async () => {
       try {
         setIsLoading(true)
-        const res = await fetch("/api/salon-services", { cache: "no-store" })
+        const query = businessUserId ? `?businessUserId=${encodeURIComponent(businessUserId)}` : ""
+        const res = await fetch(`/api/salon-services${query}`, { cache: "no-store" })
         const data = await res.json().catch(() => null)
         if (!res.ok || !data?.ok || !Array.isArray(data?.rows) || cancelled) {
           return
@@ -35,7 +36,7 @@ export function useSalonServices() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [businessUserId])
 
   const activeServices = services.filter((service) => service.isActive)
   const serviceNames = activeServices.map((service) => service.name)

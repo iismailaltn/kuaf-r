@@ -32,14 +32,15 @@ interface SettingsViewProps {
     email: string
     shopName: string
     role: string
+    businessUserId?: string
   }
 }
 
 type SettingsTab = "profile" | "security" | "google" | "notifications" | "appearance" | "business"
 
 export function SettingsView({ user }: SettingsViewProps) {
-  const { services } = useSalonServices()
-  const { settings: googleSettings, isSaving: isGoogleSaving, saveSettings: saveGoogleSettings } = useGooglePlaceSettings()
+  const { services } = useSalonServices(user?.businessUserId)
+  const { settings: googleSettings, isSaving: isGoogleSaving, saveSettings: saveGoogleSettings } = useGooglePlaceSettings(user?.businessUserId)
   const [activeTab, setActiveTab] = useState<SettingsTab>("profile")
   
   // Profile state
@@ -166,7 +167,7 @@ export function SettingsView({ user }: SettingsViewProps) {
     const res = await fetch(`/api/salon-services/${service.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ price, isActive: true }),
+      body: JSON.stringify({ businessUserId: user?.businessUserId, price, isActive: true }),
     })
     const data = await res.json().catch(() => null)
     if (!res.ok || !data?.ok) {
@@ -185,7 +186,7 @@ export function SettingsView({ user }: SettingsViewProps) {
     const res = await fetch(`/api/salon-services/${service.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ price: 0, isActive: false }),
+      body: JSON.stringify({ businessUserId: user?.businessUserId, price: 0, isActive: false }),
     })
     const data = await res.json().catch(() => null)
     if (!res.ok || !data?.ok) {

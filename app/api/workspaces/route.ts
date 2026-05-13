@@ -2,13 +2,20 @@ import { NextResponse } from "next/server"
 import { appConfig } from "@/app.config"
 import { selectByToken, sqlToken } from "@/lib/services/locofabric-database"
 import type { AxiosError } from "axios"
+import { getBusinessUserIdFromBody, getBusinessUserIdFromRequest, matchesBusinessUserId, requireBusinessUserId } from "@/lib/business-scope"
 
 function sanitizeSqlString(input: string) {
   return input.replace(/'/g, "''")
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
+    const businessUserId = getBusinessUserIdFromRequest(req)
+    const businessError = requireBusinessUserId(businessUserId)
+    if (businessError) {
+      return NextResponse.json({ ok: false, message: businessError }, { status: 400 })
+    }
+
     const token = appConfig.token.kuafor_tables
     if (!token) {
       return NextResponse.json({ ok: false, message: "kuafor_tables token tanimli degil." }, { status: 500 })
@@ -21,7 +28,7 @@ export async function GET() {
       Array.isArray(data) ? data :
       []
 
-    return NextResponse.json({ ok: true, rows })
+    return NextResponse.json({ ok: true, rows: rows.filter((row: any) => matchesBusinessUserId(row, businessUserId)) })
   } catch (err) {
     const axiosErr = err as AxiosError | undefined
     const status = (axiosErr as any)?.response?.status
@@ -44,12 +51,19 @@ export async function POST(req: Request) {
     const body = (await req.json().catch(() => null)) as
       | {
           tableNumber?: string
+          businessUserId?: string | number
           capacity?: number
           status?: string
           locationDescription?: string
           isReservable?: boolean
         }
       | null
+
+    const businessUserId = getBusinessUserIdFromBody(body)
+    const businessError = requireBusinessUserId(businessUserId)
+    if (businessError) {
+      return NextResponse.json({ ok: false, message: businessError }, { status: 400 })
+    }
 
     const token = appConfig.token.kuafor_tables
     if (!token) {
@@ -66,7 +80,7 @@ export async function POST(req: Request) {
     const locationDescription = sanitizeSqlString(String(body?.locationDescription ?? "").trim())
     const isReservable = body?.isReservable === false ? 0 : 1
 
-    const sql = `INSERT INTO restaurant_tables (tableNumber, table_number, capacity, status, locationDescription, location_description, isReservable, is_reservable, createdAt, created_at, updatedAt, updated_at) VALUES ('${tableNumber}', '${tableNumber}', ${capacity}, '${status}', ${locationDescription ? `'${locationDescription}'` : "''"}, ${locationDescription ? `'${locationDescription}'` : "''"}, ${isReservable}, ${isReservable}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+    const sql = `INSERT INTO restaurant_tables (business_user_id, tableNumber, capacity, status, locationDescription, isReservable, createdAt, updatedAt) VALUES (${businessUserId}, '${tableNumber}', ${capacity}, '${status}', ${locationDescription ? `'${locationDescription}'` : "''"}, ${isReservable}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
     await sqlToken(token, sql)
 
     return NextResponse.json({ ok: true })

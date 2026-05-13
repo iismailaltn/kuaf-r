@@ -3,6 +3,7 @@ import type { AxiosError } from "axios"
 import { appConfig } from "@/app.config"
 import { selectByToken, sqlToken } from "@/lib/services/locofabric-database"
 import { normalizeGooglePlaceSettingsRows, type GooglePlaceSettingsRow } from "@/lib/google-place-settings"
+import { getBusinessUserIdFromBody, getBusinessUserIdFromRequest, matchesBusinessUserId, requireBusinessUserId } from "@/lib/business-scope"
 
 function sanitizeSqlString(input: string) {
   return input.replace(/'/g, "''")
@@ -21,15 +22,20 @@ function extractRows(data: unknown) {
   return []
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
+    const businessUserId = getBusinessUserIdFromRequest(req)
+    const businessError = requireBusinessUserId(businessUserId)
+    if (businessError) {
+      return NextResponse.json({ ok: false, message: businessError }, { status: 400 })
+    }
     const token = appConfig.token.google_place_settings
     if (!token) {
       return NextResponse.json({ ok: false, message: "google_place_settings token tanimli degil." }, { status: 500 })
     }
 
     const data = await selectByToken<unknown>(token)
-    const rows = normalizeGooglePlaceSettingsRows(extractRows(data))
+    const rows = normalizeGooglePlaceSettingsRows(extractRows(data).filter((row) => matchesBusinessUserId(row, businessUserId)))
     const row = rows[0] ?? null
 
     return NextResponse.json({ ok: true, row })
@@ -62,8 +68,15 @@ export async function PUT(req: Request) {
           placesApiKey?: string
           apiKey?: string
           placeId?: string
+          businessUserId?: string | number
         }
       | null
+
+    const businessUserId = getBusinessUserIdFromBody(body)
+    const businessError = requireBusinessUserId(businessUserId)
+    if (businessError) {
+      return NextResponse.json({ ok: false, message: businessError }, { status: 400 })
+    }
 
     const placesApiKey = sanitizeSqlString(String(body?.placesApiKey ?? body?.apiKey ?? "").trim())
     const placeId = sanitizeSqlString(String(body?.placeId ?? "").trim())
@@ -72,19 +85,19 @@ export async function PUT(req: Request) {
     }
 
     const data = await selectByToken<unknown>(token)
-    const existingRows = normalizeGooglePlaceSettingsRows(extractRows(data))
+    const existingRows = normalizeGooglePlaceSettingsRows(extractRows(data).filter((row) => matchesBusinessUserId(row, businessUserId)))
     const existing = existingRows[0] ?? null
 
     if (existing) {
-      const sql = `UPDATE google_place_settings SET places_api_key='${placesApiKey}', placeId='${placeId}', updatedAt=CURRENT_TIMESTAMP WHERE id=${existing.id}`
+      const sql = `UPDATE google_place_settings SET places_api_key='${placesApiKey}', placeId='${placeId}', updatedAt=CURRENT_TIMESTAMP WHERE id=${existing.id} AND business_user_id=${businessUserId}`
       await sqlToken(token, sql)
     } else {
-      const sql = `INSERT INTO google_place_settings (places_api_key, placeId, createdAt, updatedAt) VALUES ('${placesApiKey}', '${placeId}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+      const sql = `INSERT INTO google_place_settings (business_user_id, places_api_key, placeId, createdAt, updatedAt) VALUES (${businessUserId}, '${placesApiKey}', '${placeId}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
       await sqlToken(token, sql)
     }
 
     const refreshed = await selectByToken<unknown>(token)
-    const row = normalizeGooglePlaceSettingsRows(extractRows(refreshed))[0] ?? null
+    const row = normalizeGooglePlaceSettingsRows(extractRows(refreshed).filter((item) => matchesBusinessUserId(item, businessUserId)))[0] ?? null
 
     return NextResponse.json({ ok: true, row })
   } catch (err) {

@@ -156,6 +156,7 @@ export async function POST(req: Request) {
         role: "user",
         accountType: databaseAccountType,
         isActive: isActive === 1,
+        businessUserId: accountType === "customer" ? userId : "",
       },
     })
   } catch (err) {

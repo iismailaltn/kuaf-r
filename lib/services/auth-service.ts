@@ -26,6 +26,7 @@ export interface AuthUser {
   accountType: string
   isActive: boolean
   staffAccepted: boolean
+  businessUserId: string
 }
 
 function toBoolean(value: unknown) {
@@ -65,8 +66,9 @@ export async function loginWithApi(payload: LoginPayload): Promise<AuthUser> {
     ? toBoolean(json.user.isActive)
     : toBoolean(getField(json.user, ["is_active", "isActive"]) ?? true)
   const staffAccepted = toBoolean(getField(json.user, ["staffAccepted", "staff_accepted"]) ?? false)
+  const businessUserId = String(getField(json.user, ["businessUserId", "business_user_id"]) ?? (accountType === "kurumsal" ? id : ""))
 
-  return { id, username, shopName, role, accountType, isActive, staffAccepted }
+  return { id, username, shopName, role, accountType, isActive, staffAccepted, businessUserId }
 }
 
 export async function registerWithApi(payload: RegisterPayload): Promise<AuthUser> {
@@ -90,6 +92,7 @@ export async function registerWithApi(payload: RegisterPayload): Promise<AuthUse
     ? toBoolean(getField(json.user, ["isActive", "is_active"]))
     : true
   const staffAccepted = toBoolean(getField(json.user, ["staffAccepted", "staff_accepted"]) ?? false)
+  const businessUserId = String(getField(json.user, ["businessUserId", "business_user_id"]) ?? (accountType === "kurumsal" ? id : ""))
 
   return {
     username,
@@ -99,5 +102,6 @@ export async function registerWithApi(payload: RegisterPayload): Promise<AuthUse
     accountType,
     isActive,
     staffAccepted,
+    businessUserId,
   }
 }

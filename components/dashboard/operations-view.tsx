@@ -78,20 +78,34 @@ function formatServiceItemsSummary(operation: SessionOperation) {
   return operation.serviceItems.map((item) => `${item.name} (${formatPrice(item.price)})`).join(", ")
 }
 
-export function OperationsView() {
+interface OperationsViewProps {
+  businessUserId?: string
+  currentUserId?: string
+  currentAccountType?: string
+}
+
+export function OperationsView({ businessUserId, currentUserId, currentAccountType }: OperationsViewProps) {
   const [operations, setOperations] = useState<SessionOperation[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedWorkspace, setSelectedWorkspace] = useState<string | null>(null)
 
   const loadOperations = useCallback(async () => {
-    const res = await fetch(`/api/session-operations?ts=${Date.now()}`, { cache: "no-store" })
+    if (!businessUserId) return
+    const params = new URLSearchParams({
+      businessUserId,
+      ts: String(Date.now()),
+    })
+    if (currentAccountType === "bireysel" && currentUserId) {
+      params.set("staffId", currentUserId)
+    }
+    const res = await fetch(`/api/session-operations?${params.toString()}`, { cache: "no-store" })
     const json = (await res.json().catch(() => null)) as { ok?: boolean; rows?: SessionOperation[] } | null
     if (!res.ok || !json?.ok || !Array.isArray(json.rows)) {
       return
     }
 
     setOperations(json.rows)
-  }, [])
+  }, [businessUserId, currentAccountType, currentUserId])
 
   useEffect(() => {
     void loadOperations()

@@ -67,6 +67,7 @@ const navItemsByRole: Record<UserRole, Array<{ id: ViewType; icon: any; label: s
     { id: "dashboard", icon: LayoutDashboard, label: "Panel" },
     { id: "my-reservations", icon: CalendarCheck2, label: "Randevularim" },
     { id: "tables", icon: UtensilsCrossed, label: "Calisma Alanlari" },
+    { id: "operations", icon: ClipboardList, label: "Islemler" },
     { id: "products", icon: Package, label: "Urunler" },
     { id: "settings", icon: Settings, label: "Ayarlar" },
   ],

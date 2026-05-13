@@ -33,12 +33,17 @@ interface SessionData {
 
 interface StaffMember {
   id: string
+  userId: string
   name: string
   specialties: string[]
 }
 
 interface PersonelApiRow {
   id?: string | number
+  user_id?: string | number
+  userId?: string | number
+  individual_user_id?: string | number
+  individualUserId?: string | number
   full_name?: string
   first_name?: string
   last_name?: string
@@ -72,6 +77,7 @@ function toStaffMember(row: PersonelApiRow, index: number): StaffMember | null {
 
   return {
     id: String(row.id ?? `EMP${String(index + 1).padStart(3, "0")}`),
+    userId: String(row.user_id ?? row.userId ?? row.individual_user_id ?? row.individualUserId ?? ""),
     name,
     specialties,
   }
@@ -91,10 +97,13 @@ function getDefaultServicePrice(serviceName: string, services: SalonService[]) {
 
 interface TablesViewProps {
   canManage?: boolean
+  businessUserId?: string
+  currentUserId?: string
+  currentAccountType?: string
 }
 
-export function TablesView({ canManage = false }: TablesViewProps) {
-  const { serviceNames: serviceOptions, activeServices } = useSalonServices()
+export function TablesView({ canManage = false, businessUserId, currentUserId, currentAccountType }: TablesViewProps) {
+  const { serviceNames: serviceOptions, activeServices } = useSalonServices(businessUserId)
   const [tables, setTables] = useState<Table[]>([])
   const [staffList, setStaffList] = useState<StaffMember[]>([])
   const [now, setNow] = useState(Date.now())
@@ -130,7 +139,8 @@ export function TablesView({ canManage = false }: TablesViewProps) {
   }, [])
 
   const loadWorkspaces = useCallback(async () => {
-    const res = await fetch("/api/workspaces")
+    if (!businessUserId) return
+    const res = await fetch(`/api/workspaces?businessUserId=${encodeURIComponent(businessUserId)}`)
     const json = (await res.json().catch(() => null)) as any
     if (!res.ok || !json?.ok || !Array.isArray(json?.rows)) {
       return
@@ -149,20 +159,24 @@ export function TablesView({ canManage = false }: TablesViewProps) {
       }
     })
     setTables(mapped)
-  }, [])
+  }, [businessUserId])
 
   const loadStaff = useCallback(async () => {
-    const res = await fetch("/api/personels", { cache: "no-store" })
+    if (!businessUserId) return
+    const res = await fetch(`/api/personels?businessUserId=${encodeURIComponent(businessUserId)}`, { cache: "no-store" })
     const json = (await res.json().catch(() => null)) as any
     if (!res.ok || !json?.ok || !Array.isArray(json?.rows)) {
       return
     }
 
-    const mapped = json.rows
+    const mapped: StaffMember[] = json.rows
       .map((row: PersonelApiRow, index: number) => toStaffMember(row, index))
       .filter((row: StaffMember | null): row is StaffMember => row !== null)
-    setStaffList(mapped)
-  }, [])
+    const visibleStaff = currentAccountType === "bireysel" && currentUserId
+      ? mapped.filter((staff) => staff.userId === currentUserId)
+      : mapped
+    setStaffList(visibleStaff)
+  }, [businessUserId, currentAccountType, currentUserId])
 
   useEffect(() => {
     void loadWorkspaces()
@@ -177,6 +191,7 @@ export function TablesView({ canManage = false }: TablesViewProps) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         tableNumber: tableName,
+        businessUserId,
         capacity: 1,
         status: "available",
         isReservable: true,
@@ -198,6 +213,7 @@ export function TablesView({ canManage = false }: TablesViewProps) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         status,
+        businessUserId,
         previousTableNumber: current.name,
       }),
     })
@@ -277,7 +293,7 @@ export function TablesView({ canManage = false }: TablesViewProps) {
       customerName: sessionForm.customerName.trim(),
       customerSurname: sessionForm.customerSurname.trim(),
       services: sessionForm.services,
-      staffId: sessionForm.staffId,
+      staffId: selectedStaff?.userId || sessionForm.staffId,
       staffName: selectedStaff?.name ?? "",
       notes: sessionForm.notes.trim(),
       startTime: Date.now(),
@@ -401,6 +417,7 @@ export function TablesView({ canManage = false }: TablesViewProps) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         workspaceId: endSessionTableId,
+        businessUserId,
         workspaceName: currentTable?.name ?? "",
         customerName: sessionData.customerName,
         customerSurname: sessionData.customerSurname,
@@ -447,6 +464,7 @@ export function TablesView({ canManage = false }: TablesViewProps) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         tableNumber: trimmed,
+        businessUserId,
         previousTableNumber: current?.name ?? "",
       }),
     })
@@ -467,6 +485,7 @@ export function TablesView({ canManage = false }: TablesViewProps) {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        businessUserId,
         previousTableNumber: current.name,
       }),
     })
@@ -551,7 +570,7 @@ export function TablesView({ canManage = false }: TablesViewProps) {
       </div>
 
       {/* Table grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-38 gap-38">
         {tables.map((table) => {
           const config = statusConfig[table.status]
           const actionButton = getActionButtonConfig(table)
@@ -559,16 +578,15 @@ export function TablesView({ canManage = false }: TablesViewProps) {
             <div
               key={table.id}
               className={cn(
-                "p-4 rounded-2xl border-2 transition-all cursor-pointer hover:shadow-md",
+                "p-5 min-h-[220px] rounded-2xl border-2 transition-all cursor-pointer hover:shadow-md",
                 config.bgColor
               )}
             >
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="font-semibold text-foreground">{table.name}</h3>
+              <div className="flex justify-end mb-2">
                 <Badge
                   variant="outline"
                   className={cn(
-                    "text-xs font-medium",
+                    "text-xs font-medium shrink-0",
                     table.status === "available" && "bg-green-100 text-green-700 border-green-300",
                     table.status === "occupied" && "bg-blue-100 text-blue-700 border-blue-300",
                     table.status === "reserved" && "bg-blue-100 text-blue-700 border-blue-300",
@@ -578,6 +596,7 @@ export function TablesView({ canManage = false }: TablesViewProps) {
                   {config.label}
                 </Badge>
               </div>
+              <h3 className="font-semibold text-foreground break-words leading-snug mb-3">{table.name}</h3>
 
               <div className="flex items-center gap-1 text-sm text-muted-foreground mb-2">
                 <Users className="w-4 h-4" />
@@ -594,17 +613,17 @@ export function TablesView({ canManage = false }: TablesViewProps) {
                   </div>
                   {table.sessionData && (
                     <div className="space-y-1.5 text-xs">
-                      <div className="flex items-center gap-1.5 text-foreground font-medium">
-                        <User className="w-3 h-3 text-primary" />
-                        <span>{table.sessionData.customerName} {table.sessionData.customerSurname}</span>
+                      <div className="flex items-center gap-1.5 text-foreground font-medium min-w-0">
+                        <User className="w-3 h-3 text-primary shrink-0" />
+                        <span className="truncate min-w-0">{table.sessionData.customerName} {table.sessionData.customerSurname}</span>
                       </div>
-                      <div className="flex items-center gap-1.5 text-muted-foreground">
-                        <Scissors className="w-3 h-3" />
-                        <span className="truncate">{table.sessionData.services.join(", ")}</span>
+                      <div className="flex items-center gap-1.5 text-muted-foreground min-w-0">
+                        <Scissors className="w-3 h-3 shrink-0" />
+                        <span className="truncate min-w-0">{table.sessionData.services.join(", ")}</span>
                       </div>
-                      <div className="flex items-center gap-1.5 text-muted-foreground">
-                        <Users className="w-3 h-3" />
-                        <span>{table.sessionData.staffName}</span>
+                      <div className="flex items-center gap-1.5 text-muted-foreground min-w-0">
+                        <Users className="w-3 h-3 shrink-0" />
+                        <span className="truncate min-w-0">{table.sessionData.staffName}</span>
                       </div>
                     </div>
                   )}

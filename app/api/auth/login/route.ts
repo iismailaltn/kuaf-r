@@ -137,19 +137,22 @@ export async function POST(req: Request) {
     const userId = String(getField(row, ["id", "ID", "user_id", "userId"]) ?? "").trim()
     const accountType = String(getField(row, ["account_type", "accountType"]) ?? "").trim().toLowerCase()
     let staffAccepted = false
+    let businessUserId = accountType === "kurumsal" ? userId : ""
     if (userId && accountType === "bireysel" && appConfig.token.personel_invitations) {
       const invitationData = await selectByToken<any>(appConfig.token.personel_invitations)
       const invitations = extractRows(invitationData)
-      staffAccepted = invitations.some((invitation) => {
+      const acceptedInvitation = invitations.find((invitation) => {
         const individualUserId = String(getField(invitation, ["individual_user_id", "individualUserId"]) ?? "").trim()
         const status = String(getField(invitation, ["status"]) ?? "").trim().toLowerCase()
         return individualUserId === userId && status === "accepted"
       })
+      staffAccepted = !!acceptedInvitation
+      businessUserId = String(getField(acceptedInvitation, ["business_user_id", "businessUserId"]) ?? "").trim()
     }
 
     return NextResponse.json({
       ok: true,
-      user: { ...row, staffAccepted },
+      user: { ...row, staffAccepted, businessUserId },
     })
   } catch (err) {
     const axiosErr = err as AxiosError | undefined

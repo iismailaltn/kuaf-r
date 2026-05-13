@@ -32,7 +32,11 @@ interface Review {
   relativeTime: string
 }
 
-export function ReviewsView() {
+interface ReviewsViewProps {
+  businessUserId?: string
+}
+
+export function ReviewsView({ businessUserId }: ReviewsViewProps) {
   const { settings, isSaving, saveSettings } = useGooglePlaceSettings()
   const [apiKey, setApiKey] = useState("")
   const [placeId, setPlaceId] = useState("")
@@ -47,7 +51,8 @@ export function ReviewsView() {
     setError(null)
 
     try {
-      const res = await fetch("/api/google-reviews", { cache: "no-store" })
+      if (!businessUserId) return
+      const res = await fetch(`/api/google-reviews?businessUserId=${encodeURIComponent(businessUserId)}`, { cache: "no-store" })
       const data = await res.json().catch(() => null)
       if (!res.ok || !data?.ok || !Array.isArray(data?.reviews)) {
         setError(String(data?.message ?? "Google yorumlari getirilemedi."))
@@ -63,7 +68,7 @@ export function ReviewsView() {
     } finally {
       setIsConnecting(false)
     }
-  }, [])
+  }, [businessUserId])
 
   useEffect(() => {
     if (!settings) {

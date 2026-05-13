@@ -1,10 +1,18 @@
 import { NextResponse } from "next/server"
 import type { AxiosError } from "axios"
 import { appConfig } from "@/app.config"
-import { sqlToken } from "@/lib/services/locofabric-database"
+import { selectByToken, sqlToken } from "@/lib/services/locofabric-database"
+import { getBusinessUserIdFromBody, requireBusinessUserId } from "@/lib/business-scope"
 
 function sanitizeSqlString(input: string) {
   return input.replace(/'/g, "''")
+}
+
+function extractRows(data: any): any[] {
+  return Array.isArray((data as any)?.data) ? (data as any).data :
+    Array.isArray((data as any)?.Data) ? (data as any).Data :
+    Array.isArray(data) ? data :
+    []
 }
 
 export async function PUT(
@@ -18,9 +26,13 @@ export async function PUT(
       return NextResponse.json({ ok: false, message: "Gecersiz hizmet id." }, { status: 400 })
     }
 
-    const token = appConfig.token.salonservis
-    if (!token) {
+    const masterToken = appConfig.token.salonservis
+    const settingsToken = appConfig.token.business_service_settings
+    if (!masterToken) {
       return NextResponse.json({ ok: false, message: "salonservis token tanimli degil." }, { status: 500 })
+    }
+    if (!settingsToken) {
+      return NextResponse.json({ ok: false, message: "business_service_settings token tanimli degil." }, { status: 500 })
     }
 
     const body = (await req.json().catch(() => null)) as
@@ -31,60 +43,49 @@ export async function PUT(
           durationMinutes?: number | string
           price?: number | string
           isActive?: boolean
+          businessUserId?: string | number
         }
       | null
 
-    const updates: string[] = []
-
-    if (body?.name != null) {
-      const name = sanitizeSqlString(String(body.name).trim())
-      if (!name) {
-        return NextResponse.json({ ok: false, message: "Hizmet adi zorunlu." }, { status: 400 })
-      }
-      updates.push(`name='${name}'`)
+    const businessUserId = getBusinessUserIdFromBody(body)
+    const businessError = requireBusinessUserId(businessUserId)
+    if (businessError) {
+      return NextResponse.json({ ok: false, message: businessError }, { status: 400 })
     }
 
-    if (body?.description !== undefined) {
-      const description = sanitizeSqlString(String(body.description ?? "").trim())
-      updates.push(description ? `description='${description}'` : "description=NULL")
+    const price = Number(body?.price ?? 0)
+    if (!Number.isFinite(price) || price < 0) {
+      return NextResponse.json({ ok: false, message: "Gecersiz fiyat." }, { status: 400 })
+    }
+    const isActive = body?.isActive === false ? 0 : 1
+
+    const masterData = await selectByToken<any>(masterToken)
+    const masterRows = extractRows(masterData)
+    const masterService = masterRows.find((row) => String(row.id ?? row.ID ?? "").trim() === String(idNum))
+    const serviceName = sanitizeSqlString(String(masterService?.name ?? body?.name ?? "").trim())
+    if (!serviceName) {
+      return NextResponse.json({ ok: false, message: "Hizmet bulunamadi." }, { status: 404 })
     }
 
-    if (body?.category != null) {
-      const category = sanitizeSqlString(String(body.category).trim())
-      if (!category) {
-        return NextResponse.json({ ok: false, message: "Kategori zorunlu." }, { status: 400 })
-      }
-      updates.push(`category='${category}'`)
+    const settingsData = await selectByToken<any>(settingsToken)
+    const existing = extractRows(settingsData).find((row) => {
+      const rowBusinessUserId = String(row.business_user_id ?? row.businessUserId ?? "").trim()
+      const serviceId = String(row.service_id ?? row.serviceId ?? "").trim()
+      return rowBusinessUserId === businessUserId && serviceId === String(idNum)
+    })
+
+    if (existing?.id ?? existing?.ID) {
+      const existingId = Number(existing.id ?? existing.ID)
+      await sqlToken(
+        settingsToken,
+        `UPDATE business_service_settings SET service_name='${serviceName}', price=${price}, is_active=${isActive}, updated_at=CURRENT_TIMESTAMP WHERE id=${existingId}`
+      )
+    } else {
+      await sqlToken(
+        settingsToken,
+        `INSERT INTO business_service_settings (business_user_id, service_id, service_name, price, is_active, created_at, updated_at) VALUES (${businessUserId}, ${idNum}, '${serviceName}', ${price}, ${isActive}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+      )
     }
-
-    if (body?.durationMinutes != null) {
-      const durationMinutes = Number(body.durationMinutes)
-      if (!Number.isFinite(durationMinutes) || durationMinutes < 0) {
-        return NextResponse.json({ ok: false, message: "Gecersiz sure." }, { status: 400 })
-      }
-      updates.push(`duration_minutes=${durationMinutes}`)
-    }
-
-    if (body?.price != null) {
-      const price = Number(body.price)
-      if (!Number.isFinite(price) || price < 0) {
-        return NextResponse.json({ ok: false, message: "Gecersiz fiyat." }, { status: 400 })
-      }
-      updates.push(`price=${price}`)
-    }
-
-    if (body?.isActive != null) {
-      updates.push(`is_active=${body.isActive === false ? 0 : 1}`)
-    }
-
-    if (!updates.length) {
-      return NextResponse.json({ ok: false, message: "Guncellenecek alan yok." }, { status: 400 })
-    }
-
-    updates.push("updated_at=CURRENT_TIMESTAMP")
-
-    const sql = `UPDATE expertise_areas SET ${updates.join(", ")} WHERE id=${idNum}`
-    await sqlToken(token, sql)
 
     return NextResponse.json({ ok: true })
   } catch (err) {

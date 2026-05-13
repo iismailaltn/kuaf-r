@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { appConfig } from "@/app.config"
 import { sqlToken } from "@/lib/services/locofabric-database"
 import type { AxiosError } from "axios"
+import { getBusinessUserIdFromBody, getBusinessUserIdFromRequest, requireBusinessUserId } from "@/lib/business-scope"
 
 function sanitizeSqlString(input: string) {
   return input.replace(/'/g, "''")
@@ -24,8 +25,14 @@ export async function PUT(
     }
 
     const body = (await req.json().catch(() => null)) as
-      | { name?: string; description?: string; price?: number; cost?: number; stock?: number; status?: string; categoryId?: number; isAvailable?: boolean }
+      | { businessUserId?: string | number; name?: string; description?: string; price?: number; cost?: number; stock?: number; status?: string; categoryId?: number; isAvailable?: boolean }
       | null
+
+    const businessUserId = getBusinessUserIdFromBody(body)
+    const businessError = requireBusinessUserId(businessUserId)
+    if (businessError) {
+      return NextResponse.json({ ok: false, message: businessError }, { status: 400 })
+    }
 
     const name = sanitizeSqlString(String(body?.name ?? "").trim())
     const description = sanitizeSqlString(String(body?.description ?? "").trim())
@@ -36,7 +43,7 @@ export async function PUT(
     const categoryId = Number(body?.categoryId ?? 1)
     const isAvailable = body?.isAvailable === false ? 0 : 1
 
-    const sql = `UPDATE menu_items SET categoryId=${categoryId}, name='${name}', description=${description ? `'${description}'` : "NULL"}, price=${price}, cost=${cost}, stock1=${stock}, status='${status}', isAvailable=${isAvailable}, updatedAt=CURRENT_TIMESTAMP WHERE id=${idNum}`
+    const sql = `UPDATE menu_items SET categoryId=${categoryId}, name='${name}', description=${description ? `'${description}'` : "NULL"}, price=${price}, cost=${cost}, stock1=${stock}, status='${status}', isAvailable=${isAvailable}, updatedAt=CURRENT_TIMESTAMP WHERE id=${idNum} AND business_user_id=${businessUserId}`
     await sqlToken(token, sql)
 
     return NextResponse.json({ ok: true })
@@ -58,7 +65,7 @@ export async function PUT(
 }
 
 export async function DELETE(
-  _req: Request,
+  req: Request,
   ctx: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -73,7 +80,13 @@ export async function DELETE(
       return NextResponse.json({ ok: false, message: "Urunler token tanimli degil." }, { status: 500 })
     }
 
-    await sqlToken(token, `DELETE FROM menu_items WHERE id=${idNum}`)
+    const businessUserId = getBusinessUserIdFromRequest(req)
+    const businessError = requireBusinessUserId(businessUserId)
+    if (businessError) {
+      return NextResponse.json({ ok: false, message: businessError }, { status: 400 })
+    }
+
+    await sqlToken(token, `DELETE FROM menu_items WHERE id=${idNum} AND business_user_id=${businessUserId}`)
     return NextResponse.json({ ok: true })
   } catch (err) {
     const axiosErr = err as AxiosError | undefined
