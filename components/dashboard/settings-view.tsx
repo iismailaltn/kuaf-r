@@ -1,5 +1,6 @@
 "use client"
 
+import { apiFetch } from "@/lib/api-fetch"
 import { useEffect, useState } from "react"
 import { useGooglePlaceSettings } from "@/hooks/use-google-place-settings"
 import { useSalonServices } from "@/hooks/use-salon-services"
@@ -23,8 +24,10 @@ import {
   Building2,
   Phone,
   MapPin,
-  Scissors
+  Scissors,
+  CreditCard,
 } from "lucide-react"
+import { CorporateBillingTab } from "@/components/dashboard/corporate-billing-tab"
 import { cn } from "@/lib/utils"
 
 interface SettingsViewProps {
@@ -33,10 +36,11 @@ interface SettingsViewProps {
     shopName: string
     role: string
     businessUserId?: string
+    accountType?: string
   }
 }
 
-type SettingsTab = "profile" | "security" | "google" | "notifications" | "appearance" | "business"
+type SettingsTab = "profile" | "security" | "google" | "notifications" | "appearance" | "business" | "billing"
 
 export function SettingsView({ user }: SettingsViewProps) {
   const { services } = useSalonServices(user?.businessUserId)
@@ -164,7 +168,7 @@ export function SettingsView({ user }: SettingsViewProps) {
     }
 
     const price = Number(servicePrices[id] ?? 0)
-    const res = await fetch(`/api/salon-services/${service.id}`, {
+    const res = await apiFetch(`/api/salon-services/${service.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ businessUserId: user?.businessUserId, price, isActive: true }),
@@ -183,7 +187,7 @@ export function SettingsView({ user }: SettingsViewProps) {
       return
     }
 
-    const res = await fetch(`/api/salon-services/${service.id}`, {
+    const res = await apiFetch(`/api/salon-services/${service.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ businessUserId: user?.businessUserId, price: 0, isActive: false }),
@@ -205,14 +209,30 @@ export function SettingsView({ user }: SettingsViewProps) {
     setServicePrices(prev => ({ ...prev, [id]: price }))
   }
 
+  const isCorporate = user?.accountType === "kurumsal"
+  const isBireysel = user?.accountType === "bireysel"
+
   const tabs = [
     { id: "profile" as SettingsTab, label: "Profil", icon: User, description: "Kisisel bilgilerinizi duzenleyin" },
-    { id: "business" as SettingsTab, label: "Isletme Ayarlari", icon: Scissors, description: "Sunulan hizmetleri yonetin" },
+    ...(isCorporate
+      ? [{ id: "billing" as SettingsTab, label: "Ödeme ve Hesap", icon: CreditCard, description: "Üyelik paketi ve ödeme yönetimi" }]
+      : []),
+    ...(!isBireysel
+      ? [{ id: "business" as SettingsTab, label: "Isletme Ayarlari", icon: Scissors, description: "Sunulan hizmetleri yonetin" }]
+      : []),
     { id: "security" as SettingsTab, label: "Sifre ve Guvenlik", icon: Lock, description: "Hesap guvenliginizi yonetin" },
-    { id: "google" as SettingsTab, label: "Google Ayarlari", icon: Key, description: "Google API baglantinizi yonetin" },
+    ...(!isBireysel
+      ? [{ id: "google" as SettingsTab, label: "Google Ayarlari", icon: Key, description: "Google API baglantinizi yonetin" }]
+      : []),
     { id: "notifications" as SettingsTab, label: "Bildirimler", icon: Bell, description: "Bildirim tercihlerinizi ayarlayin" },
     { id: "appearance" as SettingsTab, label: "Gorunum", icon: Palette, description: "Tema ve dil ayarlari" },
   ]
+
+  useEffect(() => {
+    if (isBireysel && (activeTab === "business" || activeTab === "google" || activeTab === "billing")) {
+      setActiveTab("profile")
+    }
+  }, [isBireysel, activeTab])
 
   const handleProfileSave = () => {
     setProfileSaved(true)
@@ -386,7 +406,9 @@ export function SettingsView({ user }: SettingsViewProps) {
     <div className="space-y-6">
       <div>
         <h3 className="text-lg font-semibold text-foreground mb-1">Profil Bilgileri</h3>
-        <p className="text-sm text-muted-foreground">Kisisel ve isletme bilgilerinizi guncelleyin</p>
+        <p className="text-sm text-muted-foreground">
+          {isBireysel ? "Kisisel bilgilerinizi guncelleyin" : "Kisisel ve isletme bilgilerinizi guncelleyin"}
+        </p>
       </div>
 
       {/* Profile Image */}
@@ -468,19 +490,21 @@ export function SettingsView({ user }: SettingsViewProps) {
           </div>
         </div>
 
-        <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-foreground mb-1.5">Sirket / Isletme Adi</label>
-          <div className="relative">
-            <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <input
-              type="text"
-              value={profileData.companyName}
-              onChange={(e) => setProfileData(prev => ({ ...prev, companyName: e.target.value }))}
-              className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-              placeholder="Isletme adiniz"
-            />
+        {!isBireysel && (
+          <div className="md:col-span-2">
+            <label className="block text-sm font-medium text-foreground mb-1.5">Sirket / Isletme Adi</label>
+            <div className="relative">
+              <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <input
+                type="text"
+                value={profileData.companyName}
+                onChange={(e) => setProfileData(prev => ({ ...prev, companyName: e.target.value }))}
+                className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                placeholder="Isletme adiniz"
+              />
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="md:col-span-2">
           <label className="block text-sm font-medium text-foreground mb-1.5">Adres</label>
@@ -956,6 +980,8 @@ export function SettingsView({ user }: SettingsViewProps) {
         return renderNotificationsTab()
       case "appearance":
         return renderAppearanceTab()
+      case "billing":
+        return <CorporateBillingTab businessUserId={user?.businessUserId} />
       default:
         return renderProfileTab()
     }

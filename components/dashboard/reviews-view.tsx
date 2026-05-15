@@ -1,5 +1,6 @@
 "use client"
 
+import { apiFetch } from "@/lib/api-fetch"
 import { useCallback, useEffect, useState } from "react"
 import { useGooglePlaceSettings } from "@/hooks/use-google-place-settings"
 import { cn } from "@/lib/utils"
@@ -52,7 +53,7 @@ export function ReviewsView({ businessUserId }: ReviewsViewProps) {
 
     try {
       if (!businessUserId) return
-      const res = await fetch(`/api/google-reviews?businessUserId=${encodeURIComponent(businessUserId)}`, { cache: "no-store" })
+      const res = await apiFetch(`/api/google-reviews?businessUserId=${encodeURIComponent(businessUserId)}`, { cache: "no-store" })
       const data = await res.json().catch(() => null)
       if (!res.ok || !data?.ok || !Array.isArray(data?.reviews)) {
         setError(String(data?.message ?? "Google yorumlari getirilemedi."))

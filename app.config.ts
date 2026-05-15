@@ -1,5 +1,3 @@
-import "server-only"
-
 export const appConfig = {
   baseURL: process.env.NEXT_PUBLIC_BASE_URL ?? "https://hstplanet.com/",
   serverURL: process.env.NEXT_PUBLIC_SERVER_URL ?? "https://server.hstplanet.com",

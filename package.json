@@ -5,6 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:iis": "next build && node scripts/postbuild-iis.mjs",
+    "build:iis:panel": "node scripts/build-iis-panel.mjs",
     "start": "next start",
     "lint": "eslint ."
   },

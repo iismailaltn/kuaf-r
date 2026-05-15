@@ -1,3 +1,4 @@
+import { apiFetch } from "@/lib/api-fetch"
 export interface LoginPayload {
   username: string
   password: string
@@ -46,7 +47,7 @@ function getField(row: any, candidates: string[]) {
 }
 
 export async function loginWithApi(payload: LoginPayload): Promise<AuthUser> {
-  const res = await fetch("/api/auth/login", {
+  const res = await apiFetch("/api/auth/login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -72,7 +73,7 @@ export async function loginWithApi(payload: LoginPayload): Promise<AuthUser> {
 }
 
 export async function registerWithApi(payload: RegisterPayload): Promise<AuthUser> {
-  const res = await fetch("/api/auth/register", {
+  const res = await apiFetch("/api/auth/register", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),

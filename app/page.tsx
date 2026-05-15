@@ -1,5 +1,6 @@
 "use client"
 
+import { apiFetch } from "@/lib/api-fetch"
 import { useEffect, useState } from "react"
 import { Sidebar, ViewType, UserRole } from "@/components/dashboard/sidebar"
 import { Header } from "@/components/dashboard/header"
@@ -22,9 +23,9 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { CheckCircle2, Clock3 } from "lucide-react"
+import { MEMBERSHIP_PLANS, type MembershipPlan } from "@/lib/corporate-membership"
 
 type AuthState = "login" | "register" | "authenticated"
-type MembershipPlan = "basic" | "professional"
 
 interface User {
   id: string
@@ -43,11 +44,26 @@ export default function Dashboard() {
   const [activeView, setActiveView] = useState<ViewType>("dashboard")
   const [selectedPlan, setSelectedPlan] = useState<MembershipPlan | null>(null)
   const [corporateReviewSubmitted, setCorporateReviewSubmitted] = useState(false)
+  const [isSavingPlan, setIsSavingPlan] = useState(false)
 
   const handleLogin = async (emailOrUsername: string, password: string) => {
     const loginId = emailOrUsername.trim().toLowerCase()
     if (loginId === "admin" && password === "admin") {
-      setUser({ id: "", email: "admin", shopName: "admin", role: "admin", accountType: "admin", isActive: true, staffAccepted: false, businessUserId: "" })
+      const demoBusinessUserId = (process.env.NEXT_PUBLIC_DEMO_BUSINESS_USER_ID ?? "").trim()
+      if (!demoBusinessUserId) {
+        alert("Demo giris icin gercek kurumsal hesap kullanin veya build sirasinda NEXT_PUBLIC_DEMO_BUSINESS_USER_ID tanimlayin.")
+        return
+      }
+      setUser({
+        id: demoBusinessUserId,
+        email: "admin",
+        shopName: "admin",
+        role: "admin",
+        accountType: "admin",
+        isActive: true,
+        staffAccepted: false,
+        businessUserId: demoBusinessUserId,
+      })
       setAuthState("authenticated")
       setActiveView("dashboard")
       return
@@ -139,7 +155,18 @@ export default function Dashboard() {
     )
   }
 
-  const scopedBusinessUserId = user?.businessUserId || (user?.accountType === "kurumsal" ? user.id : "")
+  const scopedBusinessUserId =
+    user?.businessUserId ||
+    (user?.accountType === "kurumsal" && user.isActive ? user.id : "") ||
+    (user?.role === "admin" && user.id ? user.id : "")
+
+  const canManageSalon =
+    user?.role === "admin" ||
+    user?.role === "supervisor" ||
+    (user?.accountType === "kurumsal" && user.isActive)
+
+  const sidebarRole: UserRole =
+    user?.accountType === "kurumsal" && user.isActive && user.role === "user" ? "admin" : (user?.role ?? "user")
 
   const renderView = () => {
     if (user?.role === "user" && user.accountType === "bireysel" && !user.staffAccepted) {
@@ -166,12 +193,30 @@ export default function Dashboard() {
         <CorporatePricingView
           selectedPlan={selectedPlan}
           onSelectPlan={setSelectedPlan}
-          onContinue={() => {
+          isSubmitting={isSavingPlan}
+          onContinue={async () => {
             if (!selectedPlan) {
               alert("Lutfen bir paket secin.")
               return
             }
-            setCorporateReviewSubmitted(true)
+            try {
+              setIsSavingPlan(true)
+              const res = await apiFetch("/api/corporate-membership", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ businessUserId: user.id, plan: selectedPlan, action: "select" }),
+              })
+              const data = await res.json().catch(() => null)
+              if (!res.ok || !data?.ok) {
+                alert(data?.message ?? "Paket kaydedilemedi.")
+                return
+              }
+              setCorporateReviewSubmitted(true)
+            } catch {
+              alert("Paket kaydedilemedi.")
+            } finally {
+              setIsSavingPlan(false)
+            }
           }}
         />
       )
@@ -185,7 +230,7 @@ export default function Dashboard() {
       case "tables":
         return (
           <TablesView
-            canManage={user?.role === "admin"}
+            canManage={canManageSalon}
             businessUserId={scopedBusinessUserId}
             currentUserId={user?.id}
             currentAccountType={user?.accountType}
@@ -196,7 +241,21 @@ export default function Dashboard() {
       case "inventory":
         return <InventoryView businessUserId={scopedBusinessUserId} />
       case "settings":
-        return <SettingsView user={user ? { email: user.email, shopName: user.shopName, role: user.role, businessUserId: scopedBusinessUserId } : undefined} />
+        return (
+          <SettingsView
+            user={
+              user
+                ? {
+                    email: user.email,
+                    shopName: user.shopName,
+                    role: user.role,
+                    businessUserId: scopedBusinessUserId,
+                    accountType: user.accountType,
+                  }
+                : undefined
+            }
+          />
+        )
       case "users":
         return <UsersView businessUserId={scopedBusinessUserId} businessUsername={user?.email} />
       case "reservations":
@@ -229,7 +288,7 @@ export default function Dashboard() {
         onViewChange={setActiveView}
         onLogout={handleLogout}
         shopName={user?.shopName}
-        role={user?.role}
+        role={sidebarRole}
         hideNavigation={user?.role === "user" && ((user.accountType === "bireysel" && !user.staffAccepted) || (user.accountType === "kurumsal" && !user.isActive))}
       />
       <div className="flex-1 flex flex-col overflow-hidden">
@@ -246,27 +305,14 @@ function CorporatePricingView({
   selectedPlan,
   onSelectPlan,
   onContinue,
+  isSubmitting = false,
 }: {
   selectedPlan: MembershipPlan | null
   onSelectPlan: (plan: MembershipPlan) => void
-  onContinue: () => void
+  onContinue: () => void | Promise<void>
+  isSubmitting?: boolean
 }) {
-  const plans = [
-    {
-      id: "basic" as const,
-      title: "Başlangıç",
-      price: "₺999",
-      description: "Küçük işletmeler için temel panel erişimi.",
-      features: ["Randevu yönetimi", "Personel yönetimi", "Temel raporlar"],
-    },
-    {
-      id: "professional" as const,
-      title: "Profesyonel",
-      price: "₺1.999",
-      description: "Büyüyen işletmeler için gelişmiş yönetim paketi.",
-      features: ["Tüm başlangıç özellikleri", "Performans ekranları", "Operasyon takibi"],
-    },
-  ]
+  const plans = MEMBERSHIP_PLANS
 
   return (
     <div className="min-h-full flex items-center justify-center p-6">
@@ -294,7 +340,7 @@ function CorporatePricingView({
               <CardContent className="space-y-6">
                 <div>
                   <span className="text-4xl font-bold text-foreground">{plan.price}</span>
-                  <span className="text-muted-foreground"> / ay</span>
+                  <span className="text-muted-foreground"> / yil</span>
                 </div>
                 <div className="space-y-3">
                   {plan.features.map((feature) => (
@@ -318,8 +364,8 @@ function CorporatePricingView({
         </div>
 
         <div className="flex justify-center">
-          <Button className="h-12 rounded-xl px-10" onClick={onContinue}>
-            İlerle
+          <Button className="h-12 rounded-xl px-10" onClick={() => void onContinue()} disabled={isSubmitting}>
+            {isSubmitting ? "Kaydediliyor..." : "Ilerle"}
           </Button>
         </div>
       </div>
@@ -347,7 +393,7 @@ function IndividualInvitationsView({ userId, onAccepted }: { userId: string; onA
 
       try {
         setIsLoading(true)
-        const res = await fetch(`/api/personel-invitations?individualUserId=${encodeURIComponent(userId)}`, { cache: "no-store" })
+        const res = await apiFetch(`/api/personel-invitations?individualUserId=${encodeURIComponent(userId)}`, { cache: "no-store" })
         const data = await res.json().catch(() => null)
         if (res.ok && data?.ok && Array.isArray(data?.rows)) {
           setRows(data.rows)
@@ -363,7 +409,7 @@ function IndividualInvitationsView({ userId, onAccepted }: { userId: string; onA
   const acceptInvitation = async (invitationId: string) => {
     try {
       setIsAcceptingId(invitationId)
-      const res = await fetch("/api/personel-invitations", {
+      const res = await apiFetch("/api/personel-invitations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "accept", invitationId }),
@@ -434,6 +480,7 @@ interface CorporateApprovalRow {
   ownerLastName: string
   taxOffice: string
   taxNumber: string
+  membershipPlanTitle: string
 }
 
 function CorporateApprovalsView() {
@@ -444,7 +491,7 @@ function CorporateApprovalsView() {
   const loadRows = async () => {
     try {
       setIsLoading(true)
-      const res = await fetch("/api/corporate-approvals", { cache: "no-store" })
+      const res = await apiFetch("/api/corporate-approvals", { cache: "no-store" })
       const data = await res.json().catch(() => null)
       if (!res.ok || !data?.ok || !Array.isArray(data?.rows)) {
         alert(data?.message ?? "Kurumsal kayitlar getirilemedi.")
@@ -463,7 +510,7 @@ function CorporateApprovalsView() {
   const approveRow = async (userId: string) => {
     try {
       setIsApprovingId(userId)
-      const res = await fetch("/api/corporate-approvals", {
+      const res = await apiFetch("/api/corporate-approvals", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId }),
@@ -495,6 +542,7 @@ function CorporateApprovalsView() {
                 <th className="px-4 py-3 text-left font-medium">Yetkili</th>
                 <th className="px-4 py-3 text-left font-medium">İletişim</th>
                 <th className="px-4 py-3 text-left font-medium">Vergi Bilgileri</th>
+                <th className="px-4 py-3 text-left font-medium">Paket</th>
                 <th className="px-4 py-3 text-right font-medium">İşlem</th>
               </tr>
             </thead>
@@ -511,6 +559,7 @@ function CorporateApprovalsView() {
                     <div>{row.taxOffice}</div>
                     <div>{row.taxNumber}</div>
                   </td>
+                  <td className="px-4 py-4 text-muted-foreground">{row.membershipPlanTitle}</td>
                   <td className="px-4 py-4 text-right">
                     <Button
                       className="rounded-xl"
@@ -524,14 +573,14 @@ function CorporateApprovalsView() {
               ))}
               {!isLoading && rows.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-10 text-center text-muted-foreground">
+                  <td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">
                     Onay bekleyen kurumsal kayıt yok.
                   </td>
                 </tr>
               )}
               {isLoading && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-10 text-center text-muted-foreground">
+                  <td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">
                     Kayıtlar yükleniyor...
                   </td>
                 </tr>

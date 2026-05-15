@@ -1,5 +1,6 @@
 "use client"
 
+import { apiFetch } from "@/lib/api-fetch"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -98,7 +99,7 @@ export function OperationsView({ businessUserId, currentUserId, currentAccountTy
     if (currentAccountType === "bireysel" && currentUserId) {
       params.set("staffId", currentUserId)
     }
-    const res = await fetch(`/api/session-operations?${params.toString()}`, { cache: "no-store" })
+    const res = await apiFetch(`/api/session-operations?${params.toString()}`, { cache: "no-store" })
     const json = (await res.json().catch(() => null)) as { ok?: boolean; rows?: SessionOperation[] } | null
     if (!res.ok || !json?.ok || !Array.isArray(json.rows)) {
       return

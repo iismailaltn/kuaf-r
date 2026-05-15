@@ -8,7 +8,16 @@ export function getBusinessUserIdFromBody(body: { businessUserId?: string | numb
 }
 
 export function isValidBusinessUserId(value: string) {
-  return /^\d+$/.test(value)
+  const trimmed = value.trim()
+  if (!trimmed) return false
+  if (/^\d+$/.test(trimmed)) return true
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(trimmed)
+}
+
+/** SQL icin: sayisal id veya UUID (tirnakli). */
+export function sqlBusinessUserIdRef(businessUserId: string) {
+  if (/^\d+$/.test(businessUserId)) return businessUserId
+  return `'${businessUserId.replace(/'/g, "''")}'`
 }
 
 function normalizeKey(value: string) {

@@ -1,5 +1,6 @@
 "use client"
 
+import { apiFetch } from "@/lib/api-fetch"
 import { useCallback, useEffect, useState, useRef } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -140,7 +141,7 @@ export function TablesView({ canManage = false, businessUserId, currentUserId, c
 
   const loadWorkspaces = useCallback(async () => {
     if (!businessUserId) return
-    const res = await fetch(`/api/workspaces?businessUserId=${encodeURIComponent(businessUserId)}`)
+    const res = await apiFetch(`/api/workspaces?businessUserId=${encodeURIComponent(businessUserId)}`)
     const json = (await res.json().catch(() => null)) as any
     if (!res.ok || !json?.ok || !Array.isArray(json?.rows)) {
       return
@@ -163,7 +164,7 @@ export function TablesView({ canManage = false, businessUserId, currentUserId, c
 
   const loadStaff = useCallback(async () => {
     if (!businessUserId) return
-    const res = await fetch(`/api/personels?businessUserId=${encodeURIComponent(businessUserId)}`, { cache: "no-store" })
+    const res = await apiFetch(`/api/personels?businessUserId=${encodeURIComponent(businessUserId)}`, { cache: "no-store" })
     const json = (await res.json().catch(() => null)) as any
     if (!res.ok || !json?.ok || !Array.isArray(json?.rows)) {
       return
@@ -186,7 +187,7 @@ export function TablesView({ canManage = false, businessUserId, currentUserId, c
   const handleAddWorkspace = async () => {
     const nextId = tables.length > 0 ? Math.max(...tables.map((t) => t.id)) + 1 : 1
     const tableName = `Calisma Alani ${nextId}`
-    const res = await fetch("/api/workspaces", {
+    const res = await apiFetch("/api/workspaces", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -199,7 +200,7 @@ export function TablesView({ canManage = false, businessUserId, currentUserId, c
     })
     const json = (await res.json().catch(() => null)) as any
     if (!res.ok || !json?.ok) {
-      alert(json?.message ?? "Calisma alani eklenemedi.")
+      alert(json?.message ?? json?.error ?? "Calisma alani eklenemedi.")
       return
     }
     await loadWorkspaces()
@@ -208,7 +209,7 @@ export function TablesView({ canManage = false, businessUserId, currentUserId, c
   const handleSetStatus = async (id: number, status: Table["status"], sessionData?: SessionData) => {
     const current = tables.find((table) => table.id === id)
     if (!current) return
-    const res = await fetch(`/api/workspaces/${id}`, {
+    const res = await apiFetch(`/api/workspaces/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -412,7 +413,7 @@ export function TablesView({ canManage = false, businessUserId, currentUserId, c
       return
     }
 
-    const res = await fetch("/api/session-operations", {
+    const res = await apiFetch("/api/session-operations", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -459,7 +460,7 @@ export function TablesView({ canManage = false, businessUserId, currentUserId, c
     const trimmed = editingName.trim()
     if (!trimmed) return
     const current = tables.find((table) => table.id === editingTableId)
-    const res = await fetch(`/api/workspaces/${editingTableId}`, {
+    const res = await apiFetch(`/api/workspaces/${editingTableId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -481,7 +482,7 @@ export function TablesView({ canManage = false, businessUserId, currentUserId, c
     if (!editingTableId) return
     const current = tables.find((table) => table.id === editingTableId)
     if (!current) return
-    const res = await fetch(`/api/workspaces/${editingTableId}`, {
+    const res = await apiFetch(`/api/workspaces/${editingTableId}`, {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

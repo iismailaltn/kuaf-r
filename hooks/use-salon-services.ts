@@ -1,5 +1,6 @@
 "use client"
 
+import { apiFetch } from "@/lib/api-fetch"
 import { useEffect, useState } from "react"
 import type { SalonService } from "@/lib/salon-services"
 
@@ -14,7 +15,7 @@ export function useSalonServices(businessUserId?: string) {
       try {
         setIsLoading(true)
         const query = businessUserId ? `?businessUserId=${encodeURIComponent(businessUserId)}` : ""
-        const res = await fetch(`/api/salon-services${query}`, { cache: "no-store" })
+        const res = await apiFetch(`/api/salon-services${query}`, { cache: "no-store" })
         const data = await res.json().catch(() => null)
         if (!res.ok || !data?.ok || !Array.isArray(data?.rows) || cancelled) {
           return

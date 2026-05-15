@@ -1,5 +1,7 @@
 "use client"
 
+import { apiFetch } from "@/lib/api-fetch"
+import { readApiJson } from "@/lib/api-response"
 import { useEffect, useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -13,6 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
+import { INDIVIDUAL_NOT_AVAILABLE_MESSAGE } from "@/lib/individual-employment"
 import { useSalonServices } from "@/hooks/use-salon-services"
 import {
   Search,
@@ -72,7 +75,7 @@ interface IndividualLookupResult {
   expertise: string[]
 }
 
-type InviteStep = "search" | "preview" | "invited"
+type InviteStep = "search" | "preview" | "invited" | "unavailable"
 
 const statusConfig = {
   aktif: {
@@ -139,6 +142,7 @@ export function UsersView({ businessUserId, businessUsername }: UsersViewProps) 
     email: "",
   })
   const [matchedIndividual, setMatchedIndividual] = useState<IndividualLookupResult | null>(null)
+  const [inviteUnavailableMessage, setInviteUnavailableMessage] = useState("")
 
   const [formData, setFormData] = useState({
     name: "",
@@ -156,8 +160,8 @@ export function UsersView({ businessUserId, businessUsername }: UsersViewProps) 
       try {
         setIsLoading(true)
         if (!businessUserId) return
-        const res = await fetch(`/api/personels?businessUserId=${encodeURIComponent(businessUserId)}`, { cache: "no-store" })
-        const data = await res.json().catch(() => null)
+        const res = await apiFetch(`/api/personels?businessUserId=${encodeURIComponent(businessUserId)}`, { cache: "no-store" })
+        const data = await readApiJson<{ ok: boolean; rows: PersonelApiRow[] }>(res)
         if (!res.ok || !data?.ok || !Array.isArray(data?.rows)) {
           return
         }
@@ -201,19 +205,19 @@ export function UsersView({ businessUserId, businessUsername }: UsersViewProps) 
         businessUserId,
         startDate: formData.startDate || new Date().toISOString().split("T")[0],
       }
-      const res = await fetch("/api/personels", {
+      const res = await apiFetch("/api/personels", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       })
-      const data = await res.json().catch(() => null)
+      const data = await readApiJson<{ ok: boolean; message?: string }>(res)
       if (!res.ok || !data?.ok) {
         alert(data?.message ?? "Calisan eklenemedi.")
         return
       }
 
-      const listRes = await fetch(`/api/personels?businessUserId=${encodeURIComponent(businessUserId ?? "")}`, { cache: "no-store" })
-      const listData = await listRes.json().catch(() => null)
+      const listRes = await apiFetch(`/api/personels?businessUserId=${encodeURIComponent(businessUserId ?? "")}`, { cache: "no-store" })
+      const listData = await readApiJson<{ ok: boolean; rows: PersonelApiRow[] }>(listRes)
       if (listRes.ok && listData?.ok && Array.isArray(listData?.rows)) {
         const mapped = listData.rows.map((row: PersonelApiRow, index: number) => toEmployeeData(row, index))
         setEmployees(mapped)
@@ -236,6 +240,7 @@ export function UsersView({ businessUserId, businessUsername }: UsersViewProps) 
       email: "",
     })
     setMatchedIndividual(null)
+    setInviteUnavailableMessage("")
     setIsSearchingIndividual(false)
   }
 
@@ -254,17 +259,23 @@ export function UsersView({ businessUserId, businessUsername }: UsersViewProps) 
 
     try {
       setIsSearchingIndividual(true)
-      const res = await fetch("/api/individual-lookup", {
+      const res = await apiFetch("/api/individual-lookup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(inviteSearch),
+        body: JSON.stringify({
+          ...inviteSearch,
+          businessUserId,
+        }),
       })
-      const data = await res.json().catch(() => null)
+      const data = await readApiJson<{ ok: boolean; message?: string; user?: IndividualLookupResult }>(res)
       if (!res.ok || !data?.ok || !data?.user) {
-        alert(data?.message ?? "Eslesen bireysel kullanici bulunamadi.")
+        setInviteUnavailableMessage(data?.message ?? INDIVIDUAL_NOT_AVAILABLE_MESSAGE)
+        setMatchedIndividual(null)
+        setInviteStep("unavailable")
         return
       }
 
+      setInviteUnavailableMessage("")
       setMatchedIndividual(data.user)
       setInviteStep("preview")
     } finally {
@@ -285,7 +296,7 @@ export function UsersView({ businessUserId, businessUsername }: UsersViewProps) 
 
     try {
       setIsSaving(true)
-      const res = await fetch("/api/personel-invitations", {
+      const res = await apiFetch("/api/personel-invitations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -295,8 +306,14 @@ export function UsersView({ businessUserId, businessUsername }: UsersViewProps) 
           individualUserId: matchedIndividual.userId,
         }),
       })
-      const data = await res.json().catch(() => null)
+      const data = await readApiJson<{ ok: boolean; message?: string }>(res)
       if (!res.ok || !data?.ok) {
+        if (res.status === 409 || data?.message === INDIVIDUAL_NOT_AVAILABLE_MESSAGE) {
+          setInviteUnavailableMessage(data?.message ?? INDIVIDUAL_NOT_AVAILABLE_MESSAGE)
+          setMatchedIndividual(null)
+          setInviteStep("unavailable")
+          return
+        }
         alert(data?.message ?? "Davet gonderilemedi.")
         return
       }
@@ -726,6 +743,21 @@ export function UsersView({ businessUserId, businessUsername }: UsersViewProps) 
                     </div>
                   )}
 
+                  {inviteStep === "unavailable" && (
+                    <div className="py-10 px-4 flex flex-col items-center justify-center text-center min-h-[280px]">
+                      <span
+                        className="text-6xl leading-none mb-6 grayscale opacity-70 select-none"
+                        role="img"
+                        aria-label="Uzgun"
+                      >
+                        😔
+                      </span>
+                      <p className="text-base sm:text-lg text-muted-foreground max-w-md leading-relaxed">
+                        {inviteUnavailableMessage || INDIVIDUAL_NOT_AVAILABLE_MESSAGE}
+                      </p>
+                    </div>
+                  )}
+
                   {inviteStep === "invited" && (
                     <div className="py-8 text-center space-y-5">
                       <div className="mx-auto w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center">
@@ -866,7 +898,7 @@ export function UsersView({ businessUserId, businessUsername }: UsersViewProps) 
             <div className="sticky bottom-0 px-6 py-4 border-t border-border bg-card/80 backdrop-blur-sm flex items-center justify-end gap-3">
               {showAddModal && !editingEmployee ? (
                 <>
-                  {inviteStep !== "invited" && (
+                  {inviteStep !== "invited" && inviteStep !== "unavailable" && (
                     <Button
                       variant="outline"
                       className="rounded-xl h-11 px-6"
@@ -882,6 +914,18 @@ export function UsersView({ businessUserId, businessUsername }: UsersViewProps) 
                       disabled={isSearchingIndividual}
                     >
                       {isSearchingIndividual ? "Araniyor..." : "Devam Et"}
+                    </Button>
+                  )}
+                  {inviteStep === "unavailable" && (
+                    <Button
+                      variant="outline"
+                      className="rounded-xl h-11 px-6"
+                      onClick={() => {
+                        setInviteStep("search")
+                        setInviteUnavailableMessage("")
+                      }}
+                    >
+                      Geri
                     </Button>
                   )}
                   {inviteStep === "preview" && (

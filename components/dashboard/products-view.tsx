@@ -1,5 +1,6 @@
 "use client"
 
+import { apiFetch } from "@/lib/api-fetch"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -78,7 +79,7 @@ export function ProductsView({ businessUserId }: ProductsViewProps) {
 
   const loadProducts = useCallback(async () => {
     if (!businessUserId) return false
-    const res = await fetch(`/api/products?businessUserId=${encodeURIComponent(businessUserId)}&ts=${Date.now()}`, { cache: "no-store" })
+    const res = await apiFetch(`/api/products?businessUserId=${encodeURIComponent(businessUserId)}&ts=${Date.now()}`, { cache: "no-store" })
     const json = (await res.json().catch(() => null)) as any
     if (!res.ok || !json?.ok || !Array.isArray(json?.rows)) {
       return false
@@ -168,7 +169,7 @@ export function ProductsView({ businessUserId }: ProductsViewProps) {
 
     // Stoktan dus
     const newStock = saleProduct.stock - saleForm.quantity
-    const res = await fetch(`/api/products/${saleProduct.id}`, {
+    const res = await apiFetch(`/api/products/${saleProduct.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

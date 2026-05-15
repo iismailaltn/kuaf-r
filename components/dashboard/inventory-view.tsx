@@ -1,5 +1,6 @@
 "use client"
 
+import { apiFetch } from "@/lib/api-fetch"
 import { useEffect, useRef, useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -175,7 +176,7 @@ export function InventoryView({ businessUserId }: InventoryViewProps) {
 
   const loadProducts = async () => {
     if (!businessUserId) return false
-    const res = await fetch(`/api/products?businessUserId=${encodeURIComponent(businessUserId)}&ts=${Date.now()}`, { cache: "no-store" })
+    const res = await apiFetch(`/api/products?businessUserId=${encodeURIComponent(businessUserId)}&ts=${Date.now()}`, { cache: "no-store" })
     const json = (await res.json().catch(() => null)) as any
     if (!res.ok || !json?.ok || !Array.isArray(json?.rows)) return false
 
@@ -241,7 +242,7 @@ export function InventoryView({ businessUserId }: InventoryViewProps) {
     }
 
     const categoryLabel = categoryOptions.find((c) => c.value === category)?.label ?? "Sac Bakim"
-    const res = await fetch("/api/products", {
+    const res = await apiFetch("/api/products", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -258,25 +259,10 @@ export function InventoryView({ businessUserId }: InventoryViewProps) {
     })
     const json = (await res.json().catch(() => null)) as any
     if (!res.ok || !json?.ok) {
-      // API basarisiz olsa bile local olarak ekle
-      const newId = `PRD${String(inventory.length + 1).padStart(3, "0")}`
-      setInventory((prev) => [
-        ...prev,
-        {
-          id: newId,
-          name,
-          description,
-          category: categoryLabel,
-          price,
-          cost,
-          stock,
-          minStock,
-          status: stock <= 0 ? "stokta yok" : stock <= minStock ? "dusuk stok" : "mevcut",
-        },
-      ])
-    } else {
-      await loadProducts()
+      alert(json?.message ?? json?.error ?? "Urun eklenemedi.")
+      return
     }
+    await loadProducts()
 
     setNewProduct({
       name: "",
@@ -322,7 +308,7 @@ export function InventoryView({ businessUserId }: InventoryViewProps) {
     }
 
     const categoryLabel = categoryOptions.find((c) => c.value === editProduct.category)?.label ?? "Sac Bakim"
-    const res = await fetch(`/api/products/${editingProductId}`, {
+    const res = await apiFetch(`/api/products/${editingProductId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -366,7 +352,7 @@ export function InventoryView({ businessUserId }: InventoryViewProps) {
   }
 
   const handleRemoveProduct = async (productId: string) => {
-    const res = await fetch(`/api/products/${productId}?businessUserId=${encodeURIComponent(businessUserId ?? "")}`, { method: "DELETE" })
+    const res = await apiFetch(`/api/products/${productId}?businessUserId=${encodeURIComponent(businessUserId ?? "")}`, { method: "DELETE" })
     const json = (await res.json().catch(() => null)) as any
     if (!res.ok || !json?.ok) {
       // API basarisiz olsa bile local olarak sil

@@ -1,5 +1,6 @@
 "use client"
 
+import { apiFetch } from "@/lib/api-fetch"
 import { useCallback, useEffect, useState } from "react"
 import type { GooglePlaceSettings } from "@/lib/google-place-settings"
 
@@ -15,7 +16,7 @@ export function useGooglePlaceSettings(businessUserId?: string) {
         setSettings(null)
         return null
       }
-      const res = await fetch(`/api/google-place-settings?businessUserId=${encodeURIComponent(businessUserId)}`, { cache: "no-store" })
+      const res = await apiFetch(`/api/google-place-settings?businessUserId=${encodeURIComponent(businessUserId)}`, { cache: "no-store" })
       const data = await res.json().catch(() => null)
       if (!res.ok || !data?.ok) {
         setSettings(null)
@@ -40,7 +41,7 @@ export function useGooglePlaceSettings(businessUserId?: string) {
   const saveSettings = useCallback(async (placesApiKey: string, placeId: string) => {
     try {
       setIsSaving(true)
-      const res = await fetch("/api/google-place-settings", {
+      const res = await apiFetch("/api/google-place-settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ businessUserId, placesApiKey, placeId }),
