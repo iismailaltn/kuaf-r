@@ -14,6 +14,8 @@ import {
   Scissors,
   Sparkles,
   Star,
+  TrendingUp,
+  UserPlus,
   Users,
 } from "lucide-react"
 
@@ -116,108 +118,164 @@ const sections: PresentationSection[] = [
   },
 ]
 
-const stats = [
-  { value: "5", label: "Entegre modül" },
-  { value: "Tek", label: "Platform" },
-  { value: "7/24", label: "Erişim" },
-  { value: "%100", label: "Dijital takip" },
+const services = [
+  {
+    icon: <CalendarCheck2 className="h-6 w-6" />,
+    title: "Çalışma Alanları",
+    description: "Koltukları, personeli ve çalışma saatlerini tek ekrandan yönetin.",
+  },
+  {
+    icon: <Users className="h-6 w-6" />,
+    title: "Müşteri Yönetimi",
+    description: "Detaylı profiller, randevu geçmişi ve sadakat takibi bir arada.",
+  },
+  {
+    icon: <Package className="h-6 w-6" />,
+    title: "Stok ve Ürünler",
+    description: "Canlı stok takibi, hızlı satış kaydı ve otomatik gelir raporları.",
+  },
+  {
+    icon: <Star className="h-6 w-6" />,
+    title: "Google Yorumları",
+    description: "Yorumları otomatik çekin, puanınızı ve itibarınızı yönetin.",
+  },
+  {
+    icon: <Instagram className="h-6 w-6" />,
+    title: "Instagram Paylaşımı",
+    description: "Müşteri onayıyla işlerinizi paylaşın, marka bilinirliğini artırın.",
+  },
+  {
+    icon: <TrendingUp className="h-6 w-6" />,
+    title: "Raporlama",
+    description: "Gelir, randevu ve performans verilerini anlık olarak izleyin.",
+  },
 ]
 
 export default function PresentationPage() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* Top bar */}
-      <header className="sticky top-0 z-50 border-b border-border/60 bg-background/80 backdrop-blur-md">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+      <header className="sticky top-0 z-50 px-3 pt-3 sm:px-5 sm:pt-5">
+        <div className="mx-auto flex max-w-[1400px] items-center justify-between rounded-2xl border border-border/60 bg-card/90 px-4 py-3 shadow-sm backdrop-blur-md sm:px-6">
           <div className="flex items-center gap-2">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-foreground">
               <Scissors className="h-5 w-5" />
             </div>
             <span className="font-semibold tracking-tight">Kuaför Panel</span>
           </div>
+          <nav className="hidden items-center gap-7 text-sm font-medium text-muted-foreground md:flex">
+            <Link href="#work-areas" className="transition-colors hover:text-foreground">
+              Çalışma Alanları
+            </Link>
+            <Link href="#customers" className="transition-colors hover:text-foreground">
+              Müşteriler
+            </Link>
+            <Link href="#services" className="transition-colors hover:text-foreground">
+              Özellikler
+            </Link>
+            <Link href="#cta" className="transition-colors hover:text-foreground">
+              İletişim
+            </Link>
+          </nav>
           <Button asChild variant="ghost" size="sm" className="gap-2">
             <Link href="/">
               <ArrowLeft className="h-4 w-4" />
-              Panele dön
+              <span className="hidden sm:inline">Panele dön</span>
             </Link>
           </Button>
         </div>
       </header>
 
       {/* Hero */}
-      <section className="relative overflow-hidden">
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-primary/5 to-transparent" />
-        <div className="relative mx-auto max-w-6xl px-6 pt-16 pb-12 text-center md:pt-24">
-          <div className="mx-auto mb-6 inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-1.5 text-sm font-medium text-muted-foreground">
-            <Sparkles className="h-4 w-4 text-primary" />
-            Salonunuz için akıllı yönetim platformu
-          </div>
-          <h1 className="mx-auto max-w-4xl text-balance text-4xl font-bold leading-tight tracking-tight md:text-6xl">
-            Kuaför salonunuzu tek bir{" "}
-            <span className="text-primary">akıllı panelden</span> yönetin
-          </h1>
-          <p className="mx-auto mt-6 max-w-2xl text-pretty text-lg leading-relaxed text-muted-foreground">
-            Çalışma alanları, müşteriler, stok, Google yorumları ve Instagram paylaşımları;
-            işletmenizin ihtiyacı olan her şey tek platformda buluşuyor.
-          </p>
-          <div className="mt-8 flex flex-wrap justify-center gap-3">
-            <Button asChild size="lg" className="gap-2">
-              <Link href="#work-areas">
-                <Play className="h-5 w-5" />
-                Özellikleri keşfedin
-              </Link>
-            </Button>
-            <Button asChild size="lg" variant="outline" className="gap-2">
-              <Link href="#cta">
-                Hemen başlayın
-                <ArrowRight className="h-5 w-5" />
-              </Link>
-            </Button>
-          </div>
-
-          {/* Hero visual */}
-          <div className="relative mx-auto mt-14 max-w-5xl">
-            <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-2xl shadow-primary/5">
-              <Image
-                src="/presentation/hero-dashboard.png"
-                alt="Kuaför Panel kontrol paneli önizlemesi"
-                width={1600}
-                height={900}
-                priority
-                className="h-auto w-full"
-              />
+      <section className="px-3 pt-6 sm:px-5 md:pt-10">
+        <div className="mx-auto grid max-w-[1400px] items-center gap-10 lg:grid-cols-2 lg:gap-8">
+          {/* Text */}
+          <div className="px-1 lg:pl-6">
+            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-1.5 text-sm font-medium text-muted-foreground">
+              <Sparkles className="h-4 w-4 text-primary" />
+              Salonunuz için akıllı yönetim platformu
             </div>
-            <div className="absolute -bottom-6 -right-6 -z-10 h-32 w-32 rounded-3xl bg-primary/10 blur-2xl" />
+            <h1 className="text-balance text-4xl font-bold leading-[1.1] tracking-tight md:text-5xl lg:text-6xl">
+              Kuaför Salonu Yönetiminde{" "}
+              <span className="rounded-xl bg-primary px-3 text-primary-foreground">Yeni Nesil</span>{" "}
+              Çözüm
+            </h1>
+            <p className="mt-6 max-w-xl text-pretty text-lg leading-relaxed text-muted-foreground">
+              Çalışma alanları, müşteriler, stok, Google yorumları ve Instagram paylaşımları;
+              işletmenizin ihtiyacı olan her şey tek platformda buluşuyor.
+            </p>
+            <div className="mt-8 flex flex-wrap items-center gap-4">
+              <Button asChild size="lg" className="gap-2">
+                <Link href="#work-areas">
+                  Özellikleri keşfedin
+                  <ArrowRight className="h-5 w-5" />
+                </Link>
+              </Button>
+              <Link
+                href="#services"
+                className="group flex items-center gap-3 text-sm font-medium text-foreground"
+              >
+                <span className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-primary text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
+                  <Play className="h-5 w-5" />
+                </span>
+                Tanıtımı izle
+              </Link>
+            </div>
           </div>
 
-          {/* Stats */}
-          <div className="mt-16 grid grid-cols-2 gap-4 md:grid-cols-4">
-            {stats.map((stat) => (
-              <div
-                key={stat.label}
-                className="rounded-2xl border border-border bg-card px-4 py-6"
-              >
-                <div className="text-3xl font-bold text-primary">{stat.value}</div>
-                <div className="mt-1 text-sm text-muted-foreground">{stat.label}</div>
+          {/* Visual */}
+          <div className="relative">
+            <div className="relative overflow-hidden rounded-[2rem] bg-primary/10 p-4 sm:p-6">
+              <div className="absolute -right-10 -top-10 h-48 w-48 rounded-full bg-primary/15" />
+              <div className="relative overflow-hidden rounded-2xl border border-border bg-card shadow-2xl shadow-primary/10">
+                <Image
+                  src="/presentation/hero-dashboard.png"
+                  alt="Kuaför Panel kontrol paneli önizlemesi"
+                  width={1600}
+                  height={900}
+                  priority
+                  className="h-auto w-full"
+                />
               </div>
-            ))}
+
+              {/* Floating stat cards */}
+              <div className="absolute right-6 top-10 flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3 shadow-lg">
+                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <TrendingUp className="h-5 w-5" />
+                </span>
+                <div>
+                  <div className="text-xs text-muted-foreground">Aylık Gelir</div>
+                  <div className="text-sm font-bold">₺128K</div>
+                </div>
+              </div>
+              <div className="absolute bottom-10 left-6 flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3 shadow-lg">
+                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <UserPlus className="h-5 w-5" />
+                </span>
+                <div>
+                  <div className="text-xs text-muted-foreground">Yeni Müşteri</div>
+                  <div className="text-sm font-bold">+340</div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
       {/* Feature sections */}
-      <div className="mx-auto max-w-6xl px-6">
-        {sections.map((section, index) => (
+      <div className="mx-auto max-w-[1400px] px-3 sm:px-5">
+        {sections.map((section) => (
           <section
             key={section.id}
             id={section.id}
-            className="scroll-mt-24 border-t border-border/60 py-20 md:py-28"
+            className="scroll-mt-28 border-t border-border/60 py-16 md:py-24"
           >
-            <div className="grid items-center gap-10 md:grid-cols-2 md:gap-16">
+            <div className="grid items-center gap-10 md:grid-cols-2 md:gap-14 lg:gap-20">
               {/* Media */}
               <div className={section.imageOnLeft ? "md:order-1" : "md:order-2"}>
-                <div className="relative">
-                  <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-xl shadow-primary/5">
+                <div className="relative overflow-hidden rounded-[2rem] bg-primary/10 p-4 sm:p-6">
+                  <div className="absolute -left-10 -top-10 h-40 w-40 rounded-full bg-primary/15" />
+                  <div className="relative overflow-hidden rounded-2xl border border-border bg-card shadow-xl shadow-primary/5">
                     <Image
                       src={section.image || "/placeholder.svg"}
                       alt={`${section.eyebrow} ekran görüntüsü`}
@@ -226,7 +284,6 @@ export default function PresentationPage() {
                       className="h-auto w-full"
                     />
                   </div>
-                  <div className="absolute -z-10 -bottom-5 -left-5 h-24 w-24 rounded-2xl bg-primary/10 blur-xl" />
                 </div>
               </div>
 
@@ -244,7 +301,7 @@ export default function PresentationPage() {
                 <p className="mt-4 text-pretty text-lg leading-relaxed text-muted-foreground">
                   {section.description}
                 </p>
-                <ul className="mt-6 space-y-3">
+                <ul className="mt-6 grid gap-3 sm:grid-cols-2">
                   {section.features.map((feature) => (
                     <li key={feature} className="flex items-start gap-3">
                       <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
@@ -258,18 +315,52 @@ export default function PresentationPage() {
         ))}
       </div>
 
+      {/* Services grid */}
+      <section id="services" className="scroll-mt-28 px-3 pb-20 pt-4 sm:px-5">
+        <div className="mx-auto max-w-[1400px] rounded-[2.5rem] bg-primary px-5 py-16 text-primary-foreground sm:px-10 md:py-20">
+          <div className="mx-auto max-w-2xl text-center">
+            <span className="text-sm font-semibold uppercase tracking-wide text-primary-foreground/80">
+              Neler Sunuyoruz
+            </span>
+            <h2 className="mt-3 text-balance text-3xl font-bold tracking-tight md:text-4xl">
+              Tek platform, eksiksiz salon yönetimi
+            </h2>
+            <p className="mx-auto mt-4 text-pretty text-primary-foreground/85">
+              İşletmenizi büyütmek için ihtiyaç duyduğunuz tüm araçlar tek bir yerde.
+            </p>
+          </div>
+
+          <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {services.map((service) => (
+              <div
+                key={service.title}
+                className="rounded-2xl border border-primary-foreground/15 bg-primary-foreground/10 p-6 backdrop-blur-sm transition-colors hover:bg-primary-foreground/15"
+              >
+                <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary-foreground/15 text-primary-foreground">
+                  {service.icon}
+                </span>
+                <h3 className="mt-5 text-lg font-semibold">{service.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-primary-foreground/80">
+                  {service.description}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* CTA */}
-      <section id="cta" className="scroll-mt-24 px-6 pb-24 pt-8">
-        <div className="mx-auto max-w-5xl overflow-hidden rounded-3xl bg-primary px-8 py-16 text-center text-primary-foreground">
+      <section id="cta" className="scroll-mt-28 px-3 pb-24 sm:px-5">
+        <div className="mx-auto max-w-[1400px] overflow-hidden rounded-[2rem] border border-border bg-card px-6 py-16 text-center sm:px-10">
           <h2 className="text-balance text-3xl font-bold tracking-tight md:text-4xl">
             Salonunuzu dijital çağa taşımaya hazır mısınız?
           </h2>
-          <p className="mx-auto mt-4 max-w-2xl text-pretty text-lg text-primary-foreground/85">
+          <p className="mx-auto mt-4 max-w-2xl text-pretty text-lg text-muted-foreground">
             Randevular, müşteriler, stok ve sosyal medya yönetimini tek platformda birleştirin.
             Tüm ekibiniz aynı sistemde, her şey kontrol altında.
           </p>
           <div className="mt-8 flex flex-wrap justify-center gap-3">
-            <Button asChild size="lg" variant="secondary" className="gap-2">
+            <Button asChild size="lg" className="gap-2">
               <Link href="/">
                 Panele git
                 <ArrowRight className="h-5 w-5" />
@@ -281,7 +372,7 @@ export default function PresentationPage() {
 
       {/* Footer */}
       <footer className="border-t border-border py-8">
-        <div className="mx-auto max-w-6xl px-6 text-center text-sm text-muted-foreground">
+        <div className="mx-auto max-w-[1400px] px-5 text-center text-sm text-muted-foreground">
           <p>© {new Date().getFullYear()} Kuaför Panel Sistemi. Tüm hakları saklıdır.</p>
         </div>
       </footer>
