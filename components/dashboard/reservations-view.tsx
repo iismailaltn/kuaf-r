@@ -26,6 +26,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Plus, ListChecks } from "lucide-react"
 import { cn } from "@/lib/utils"
 import {
   ChevronLeft,
@@ -474,7 +476,7 @@ export function ReservationsView({ businessUserId }: ReservationsViewProps) {
             <div>
               <CardTitle>{formatSelectedDate()}</CardTitle>
               <CardDescription className="mt-1">
-                Personel kartına tıklayın, müsait saatleri seçin
+                Günün randevularını görüntüleyin veya yeni randevu ekleyin
               </CardDescription>
             </div>
             <Button
@@ -490,95 +492,106 @@ export function ReservationsView({ businessUserId }: ReservationsViewProps) {
             </Button>
           </CardHeader>
 
-          <CardContent className="p-4 sm:p-6 space-y-6">
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-foreground">Bu günün randevuları</h3>
-                <Badge variant="secondary" className="rounded-full">
-                  {dayReservations.length}
-                </Badge>
-              </div>
+          <CardContent className="p-4 sm:p-6">
+            <Tabs defaultValue="list" className="gap-5">
+              <TabsList className="w-full grid grid-cols-2 h-11 rounded-xl p-1">
+                <TabsTrigger value="list" className="rounded-lg gap-2">
+                  <ListChecks className="w-4 h-4" />
+                  Randevular
+                  <Badge variant="secondary" className="rounded-full px-1.5 min-w-5 h-5 justify-center">
+                    {dayReservations.length}
+                  </Badge>
+                </TabsTrigger>
+                <TabsTrigger value="add" className="rounded-lg gap-2">
+                  <Plus className="w-4 h-4" />
+                  Yeni Ekle
+                </TabsTrigger>
+              </TabsList>
 
-              {dayReservations.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center">
-                  <Calendar className="w-8 h-8 text-muted-foreground mx-auto mb-2 opacity-60" />
-                  <p className="text-sm text-muted-foreground">Bu gün için henüz randevu yok</p>
-                </div>
-              ) : (
-                <ul className="space-y-2">
-                  {dayReservations.map((r) => {
-                    const meta = statusMeta[r.status] ?? statusMeta.pending
-                    return (
-                      <li
-                        key={r.id}
-                        className="flex items-start gap-3 rounded-xl border border-border bg-card px-4 py-3"
-                      >
-                        <div className="flex flex-col items-center justify-center rounded-lg bg-muted px-3 py-2 shrink-0">
-                          <span className="text-sm font-semibold text-foreground tabular-nums">
-                            {r.startTime}
-                          </span>
-                          <span className="text-[11px] text-muted-foreground tabular-nums">
-                            {r.endTime}
-                          </span>
-                        </div>
-
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
-                            <p className="text-sm font-medium text-foreground truncate">
-                              {r.customerName} {r.customerSurname}
-                            </p>
-                            <Badge className={cn("rounded-full border-0", meta.className)}>
-                              {meta.label}
-                            </Badge>
-                          </div>
-                          {r.serviceNames.length > 0 && (
-                            <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                              <Scissors className="inline w-3 h-3 mr-1 -mt-0.5" />
-                              {r.serviceNames.join(", ")}
-                            </p>
-                          )}
-                          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1 text-xs text-muted-foreground">
-                            <span className="inline-flex items-center gap-1">
-                              <User className="w-3 h-3" />
-                              {r.staffName}
+              <TabsContent value="list" className="mt-0">
+                {dayReservations.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-border px-4 py-12 text-center">
+                    <Calendar className="w-8 h-8 text-muted-foreground mx-auto mb-2 opacity-60" />
+                    <p className="text-sm text-muted-foreground">Bu gün için henüz randevu yok</p>
+                    <p className="text-xs text-muted-foreground/80 mt-1">
+                      Yeni Ekle sekmesinden randevu oluşturabilirsiniz
+                    </p>
+                  </div>
+                ) : (
+                  <ul className="space-y-2 max-h-[28rem] overflow-y-auto pr-1 -mr-1">
+                    {dayReservations.map((r) => {
+                      const meta = statusMeta[r.status] ?? statusMeta.pending
+                      return (
+                        <li
+                          key={r.id}
+                          className="flex items-start gap-3 rounded-xl border border-border bg-card px-4 py-3"
+                        >
+                          <div className="flex flex-col items-center justify-center rounded-lg bg-muted px-3 py-2 shrink-0">
+                            <span className="text-sm font-semibold text-foreground tabular-nums">
+                              {r.startTime}
                             </span>
-                            {r.phone && (
+                            <span className="text-[11px] text-muted-foreground tabular-nums">
+                              {r.endTime}
+                            </span>
+                          </div>
+
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-medium text-foreground truncate">
+                                {r.customerName} {r.customerSurname}
+                              </p>
+                              <Badge className={cn("rounded-full border-0", meta.className)}>
+                                {meta.label}
+                              </Badge>
+                            </div>
+                            {r.serviceNames.length > 0 && (
+                              <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                                <Scissors className="inline w-3 h-3 mr-1 -mt-0.5" />
+                                {r.serviceNames.join(", ")}
+                              </p>
+                            )}
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1 text-xs text-muted-foreground">
                               <span className="inline-flex items-center gap-1">
-                                <Phone className="w-3 h-3" />
-                                {r.phone}
+                                <User className="w-3 h-3" />
+                                {r.staffName}
                               </span>
-                            )}
-                            <span className="inline-flex items-center gap-1">
-                              <Clock className="w-3 h-3" />
-                              {r.totalMinutes} dk
-                            </span>
-                            {sourceLabels[r.source] && (
-                              <span className="text-muted-foreground/80">
-                                {sourceLabels[r.source]}
+                              {r.phone && (
+                                <span className="inline-flex items-center gap-1">
+                                  <Phone className="w-3 h-3" />
+                                  {r.phone}
+                                </span>
+                              )}
+                              <span className="inline-flex items-center gap-1">
+                                <Clock className="w-3 h-3" />
+                                {r.totalMinutes} dk
                               </span>
-                            )}
+                              {sourceLabels[r.source] && (
+                                <span className="text-muted-foreground/80">
+                                  {sourceLabels[r.source]}
+                                </span>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      </li>
-                    )
-                  })}
-                </ul>
-              )}
-            </div>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                )}
+              </TabsContent>
 
-            <div className="space-y-3 border-t border-border pt-6">
-              <h3 className="text-sm font-semibold text-foreground">Yeni randevu ekle</h3>
-              {staffList.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-8">Personel bulunamadi.</p>
-              ) : (
-                <StaffPickerGrid
-                  staffList={staffList}
-                  getBookings={getStaffReservations}
-                  getVisibleSlots={getVisibleSlotsForStaff}
-                  onSelectStaff={handleSelectStaff}
-                />
-              )}
-            </div>
+              <TabsContent value="add" className="mt-0">
+                {staffList.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">Personel bulunamadi.</p>
+                ) : (
+                  <StaffPickerGrid
+                    staffList={staffList}
+                    getBookings={getStaffReservations}
+                    getVisibleSlots={getVisibleSlotsForStaff}
+                    onSelectStaff={handleSelectStaff}
+                  />
+                )}
+              </TabsContent>
+            </Tabs>
           </CardContent>
         </Card>
       ) : (
