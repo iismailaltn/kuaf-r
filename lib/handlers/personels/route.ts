@@ -3,6 +3,7 @@ import { appConfig } from "@/app.config"
 import { selectByToken, sqlToken } from "@/lib/services/locofabric-database"
 import { getBusinessUserIdFromBody, getBusinessUserIdFromRequest, matchesBusinessUserId, requireBusinessUserId, sqlBusinessUserIdRef } from "@/lib/business-scope"
 import { apiJson } from "@/lib/api-response"
+import { mergePersonelRows } from "@/lib/personel-directory"
 
 function sanitizeSqlString(input: string) {
   return input.replace(/'/g, "''")
@@ -88,7 +89,7 @@ export async function GET(req: Request) {
 
     return apiJson({
       ok: true,
-      rows: [...filteredRows, ...acceptedInvitationRows],
+      rows: mergePersonelRows(filteredRows, acceptedInvitationRows),
     })
   } catch (err) {
     const axiosErr = err as AxiosError | undefined

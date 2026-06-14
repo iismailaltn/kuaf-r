@@ -1,6 +1,22 @@
 "use client"
 
-import { useState } from "react"
+import { appConfig } from "@/app.config"
+import { apiFetch } from "@/lib/api-fetch"
+import { useCallback, useEffect, useId, useMemo, useState, type ReactNode } from "react"
+import { fetchAllSessionOperationsForBusiness } from "@/lib/session-operations-query"
+import { fetchPersonelRowsForBusiness, getActivePersonelNames } from "@/lib/personel-directory"
+import {
+  buildEmployeeDurationChart,
+  buildEmployeeOperationChart,
+  buildOperationsTrendChart,
+  buildPeakDaysChart,
+  buildPeakHoursChart,
+  buildRevenueByServiceChart,
+  countCompletedInRange,
+  SESSION_OPERATIONS_UPDATED_EVENT,
+  type PerformancePeriod,
+} from "@/lib/session-performance-analytics"
+import type { SessionOperation } from "@/lib/session-operations"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 import {
@@ -14,15 +30,16 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  ResponsiveContainer,
   Legend,
   AreaChart,
   Area,
 } from "recharts"
+import type { ChartConfig } from "@/components/ui/chart"
 import { TrendingUp, Users, Clock, Scissors, DollarSign, ChevronLeft, ChevronRight } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { PerformanceExportPanel } from "@/components/dashboard/performance-export-panel"
 
-type Period = "daily" | "monthly" | "yearly"
+type Period = PerformancePeriod
 
 // Renk paleti
 const COLORS = {
@@ -42,100 +59,51 @@ const MONTHS_SHORT = ["Oca", "Sub", "Mar", "Nis", "May", "Haz", "Tem", "Agu", "E
 const DAYS = ["Pazar", "Pazartesi", "Sali", "Carsamba", "Persembe", "Cuma", "Cumartesi"]
 const DAYS_SHORT = ["Paz", "Pzt", "Sal", "Car", "Per", "Cum", "Cmt"]
 
-// Calisan verileri
-const employees = [
-  { id: 1, name: "Ahmet Y.", renk: COLORS.primary },
-  { id: 2, name: "Ayse K.", renk: COLORS.secondary },
-  { id: 3, name: "Mehmet D.", renk: COLORS.tertiary },
-  { id: 4, name: "Fatma C.", renk: COLORS.quaternary },
-  { id: 5, name: "Ali O.", renk: COLORS.purple },
+const CHART_COLORS = [
+  COLORS.primary,
+  COLORS.secondary,
+  COLORS.tertiary,
+  COLORS.quaternary,
+  COLORS.purple,
+  COLORS.pink,
+  COLORS.cyan,
+  COLORS.lime,
 ]
 
-// Calisan islem verisi uretici
-const generateEmployeeData = (date: Date, period: Period) => {
-  const seed = date.getDate() + date.getMonth() * 31 + date.getFullYear()
-  return employees.map((emp, idx) => ({
-    name: emp.name,
-    islem: period === "daily" 
-      ? Math.floor(5 + ((seed * (idx + 1)) % 12))
-      : period === "monthly"
-        ? Math.floor(120 + ((seed * (idx + 1)) % 150))
-        : Math.floor(1500 + ((seed * (idx + 1)) % 1500)),
-    renk: emp.renk,
-  }))
+const CHART_SURFACE_CLASS =
+  "!aspect-auto w-full min-w-0 max-w-full [&_.recharts-responsive-container]:!w-full [&_.recharts-responsive-container]:!h-full"
+
+function PerformanceChartFrame({
+  config,
+  height,
+  minHeight = 260,
+  className,
+  children,
+}: {
+  config: ChartConfig
+  height: number
+  minHeight?: number
+  className?: string
+  children: ReactNode
+}) {
+  return (
+    <div className="w-full min-w-0 overflow-x-auto">
+      <ChartContainer
+        config={config}
+        className={cn(CHART_SURFACE_CLASS, className)}
+        style={{ height: Math.max(minHeight, height), minHeight }}
+      >
+        {children}
+      </ChartContainer>
+    </div>
+  )
 }
 
-// Ortalama islem suresi verisi
-const generateDurationData = (date: Date) => {
-  const seed = date.getDate() + date.getMonth() * 31
-  return employees.map((emp, idx) => ({
-    name: emp.name,
-    sure: 25 + ((seed * (idx + 1)) % 35),
-    hedef: 30 + (idx % 3) * 10,
-  }))
+function staffChartHeight(count: number, rowHeight = 52, min = 260, max = 440) {
+  return Math.max(min, Math.min(max, count * rowHeight))
 }
 
-// Gunluk islem grafigi verisi (son 7 gun)
-const generateDailyOperations = (date: Date) => {
-  const result = []
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date(date)
-    d.setDate(d.getDate() - i)
-    const dayName = DAYS_SHORT[d.getDay()]
-    const seed = d.getDate() + d.getMonth() * 31
-    result.push({
-      gun: `${d.getDate()} ${dayName}`,
-      islem: 20 + (seed % 50),
-      musteri: 15 + (seed % 40),
-    })
-  }
-  return result
-}
-
-// Aylik islem grafigi verisi (12 ay)
-const generateMonthlyOperations = (year: number) => {
-  return MONTHS_SHORT.map((ay, idx) => {
-    const seed = idx + year
-    return {
-      ay,
-      islem: 600 + (seed * 37 % 500),
-      musteri: 500 + (seed * 29 % 400),
-    }
-  })
-}
-
-// Yillik islem grafigi verisi (son 5 yil)
-const generateYearlyOperations = (currentYear: number) => {
-  const result = []
-  for (let i = 4; i >= 0; i--) {
-    const year = currentYear - i
-    const seed = year
-    result.push({
-      yil: year.toString(),
-      islem: 8000 + (seed * 123 % 5000),
-      musteri: 6500 + (seed * 97 % 4000),
-    })
-  }
-  return result
-}
-
-// En cok kazandiran islemler
-const generateRevenueByService = (date: Date, period: Period) => {
-  const seed = date.getDate() + date.getMonth() * 31 + date.getFullYear()
-  const multiplier = period === "daily" ? 1 : period === "monthly" ? 30 : 365
-  return [
-    { name: "Sac Boyama", kazanc: Math.floor((1500 + (seed % 500)) * multiplier / 30), renk: COLORS.primary },
-    { name: "Sac Kesimi", kazanc: Math.floor((1200 + (seed % 400)) * multiplier / 30), renk: COLORS.secondary },
-    { name: "Fon", kazanc: Math.floor((900 + (seed % 300)) * multiplier / 30), renk: COLORS.tertiary },
-    { name: "Manikur/Pedikur", kazanc: Math.floor((600 + (seed % 200)) * multiplier / 30), renk: COLORS.quaternary },
-    { name: "Cilt Bakimi", kazanc: Math.floor((500 + (seed % 200)) * multiplier / 30), renk: COLORS.purple },
-    { name: "Makyaj", kazanc: Math.floor((400 + (seed % 150)) * multiplier / 30), renk: COLORS.pink },
-    { name: "Agda", kazanc: Math.floor((300 + (seed % 100)) * multiplier / 30), renk: COLORS.cyan },
-    { name: "Kas Dizayn", kazanc: Math.floor((200 + (seed % 80)) * multiplier / 30), renk: COLORS.lime },
-  ]
-}
-
-// Ciro ve net kazanc verisi
+// Ciro ve net kazanc verisi (ornek veri)
 const generateRevenueData = (date: Date, period: Period) => {
   if (period === "daily") {
     // Son 7 gun
@@ -196,25 +164,6 @@ const generateSatisfactionData = (year: number) => {
       geriDonus: 60 + (seed * 3 % 25),
     }
   })
-}
-
-// Yogun saatler verisi (gune gore)
-const generatePeakHoursDaily = (date: Date) => {
-  const seed = date.getDate() + date.getMonth() * 31
-  const hours = ["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00", "20:00"]
-  return hours.map((saat, idx) => ({
-    saat,
-    musteri: 3 + ((seed + idx * 7) % 20),
-  }))
-}
-
-// Yogun gunler verisi (aya gore)
-const generatePeakDaysMonthly = (date: Date) => {
-  const seed = date.getMonth() + date.getFullYear()
-  return DAYS_SHORT.map((gun, idx) => ({
-    gun,
-    musteri: 20 + ((seed + idx * 17) % 60),
-  }))
 }
 
 // Tarih formatla
@@ -338,27 +287,94 @@ function StatCard({
   )
 }
 
-export function PerformanceView() {
+interface PerformanceViewProps {
+  businessUserId?: string
+  shopName?: string
+}
+
+export function PerformanceView({ businessUserId, shopName }: PerformanceViewProps) {
+  const [sessionOperations, setSessionOperations] = useState<SessionOperation[]>([])
+  const [staffNames, setStaffNames] = useState<string[]>([])
+  const [serviceNames, setServiceNames] = useState<string[]>([])
+  const [isLoadingSessions, setIsLoadingSessions] = useState(false)
+
+  const loadSessionOperations = useCallback(async () => {
+    if (!businessUserId) {
+      setSessionOperations([])
+      setStaffNames([])
+      setServiceNames([])
+      return
+    }
+
+    const operationsToken = appConfig.token.session_operations
+    if (!operationsToken) {
+      return
+    }
+
+    setIsLoadingSessions(true)
+    try {
+      const [rows, personelRows] = await Promise.all([
+        fetchAllSessionOperationsForBusiness(operationsToken, businessUserId),
+        fetchPersonelRowsForBusiness(businessUserId),
+      ])
+      setSessionOperations(rows)
+      setStaffNames(getActivePersonelNames(personelRows))
+
+      const servicesRes = await apiFetch(
+        `/api/salon-services?businessUserId=${encodeURIComponent(businessUserId)}&ts=${Date.now()}`,
+        { cache: "no-store" },
+      )
+      const servicesJson = (await servicesRes.json().catch(() => null)) as {
+        ok?: boolean
+        rows?: Array<{ name?: string; isActive?: boolean }>
+      } | null
+      if (servicesRes.ok && servicesJson?.ok && Array.isArray(servicesJson.rows)) {
+        setServiceNames(
+          servicesJson.rows
+            .filter((row) => row.isActive !== false)
+            .map((row) => String(row.name ?? "").trim())
+            .filter(Boolean),
+        )
+      } else {
+        setServiceNames([])
+      }
+    } finally {
+      setIsLoadingSessions(false)
+    }
+  }, [businessUserId])
+
+  useEffect(() => {
+    void loadSessionOperations()
+  }, [loadSessionOperations])
+
+  useEffect(() => {
+    const onUpdated = () => {
+      void loadSessionOperations()
+    }
+    window.addEventListener(SESSION_OPERATIONS_UPDATED_EVENT, onUpdated)
+    return () => window.removeEventListener(SESSION_OPERATIONS_UPDATED_EVENT, onUpdated)
+  }, [loadSessionOperations])
+
   // State for each chart
-  const [employeePeriod, setEmployeePeriod] = useState<Period>("daily")
+  const [employeePeriod, setEmployeePeriod] = useState<Period>("yearly")
   const [employeeDate, setEmployeeDate] = useState(new Date())
   
   const [durationDate, setDurationDate] = useState(new Date())
-  const [durationPeriod, setDurationPeriod] = useState<Period>("daily")
+  const [durationPeriod, setDurationPeriod] = useState<Period>("yearly")
   
-  const [operationsPeriod, setOperationsPeriod] = useState<Period>("daily")
+  const [operationsPeriod, setOperationsPeriod] = useState<Period>("yearly")
   const [operationsDate, setOperationsDate] = useState(new Date())
   
-  const [servicePeriod, setServicePeriod] = useState<Period>("daily")
+  const [servicePeriod, setServicePeriod] = useState<Period>("yearly")
   const [serviceDate, setServiceDate] = useState(new Date())
   
-  const [revenuePeriod, setRevenuePeriod] = useState<Period>("monthly")
+  const [revenuePeriod, setRevenuePeriod] = useState<Period>("yearly")
   const [revenueDate, setRevenueDate] = useState(new Date())
   
   const [satisfactionYear, setSatisfactionYear] = useState(new Date().getFullYear())
-  const [satisfactionPeriod, setSatisfactionPeriod] = useState<"monthly" | "yearly">("monthly")
+  const [satisfactionPeriod, setSatisfactionPeriod] = useState<"monthly" | "yearly">("yearly")
   
-  const [peakPeriod, setPeakPeriod] = useState<"daily" | "monthly">("daily")
+  const [peakPeriod, setPeakPeriod] = useState<"daily" | "monthly">("monthly")
   const [peakDate, setPeakDate] = useState(new Date())
 
   // Navigation helpers
@@ -380,39 +396,93 @@ export function PerformanceView() {
     return date.getFullYear().toString()
   }
 
-  // Get data based on current selections
-  const employeeData = generateEmployeeData(employeeDate, employeePeriod)
-  const durationData = generateDurationData(durationDate)
-  
-  const getOperationsData = () => {
-    if (operationsPeriod === "daily") {
-      return { data: generateDailyOperations(operationsDate), xKey: "gun" }
-    } else if (operationsPeriod === "monthly") {
-      return { data: generateMonthlyOperations(operationsDate.getFullYear()), xKey: "ay" }
-    } else {
-      return { data: generateYearlyOperations(operationsDate.getFullYear()), xKey: "yil" }
-    }
-  }
+  const employeeData = useMemo(
+    () =>
+      buildEmployeeOperationChart(
+        sessionOperations,
+        employeeDate,
+        employeePeriod,
+        CHART_COLORS,
+        staffNames,
+      ),
+    [sessionOperations, employeeDate, employeePeriod, staffNames],
+  )
 
-  const serviceData = generateRevenueByService(serviceDate, servicePeriod)
+  const durationData = useMemo(
+    () => buildEmployeeDurationChart(sessionOperations, durationDate, durationPeriod, staffNames),
+    [sessionOperations, durationDate, durationPeriod, staffNames],
+  )
+
+  const employeeChartMax = useMemo(
+    () => Math.max(1, ...employeeData.map((item) => item.islem)),
+    [employeeData],
+  )
+
+  const durationChartMax = useMemo(
+    () => Math.max(1, ...durationData.map((item) => Math.max(item.sure, item.hedef))),
+    [durationData],
+  )
+
+  const operationsChart = useMemo(
+    () => buildOperationsTrendChart(sessionOperations, operationsDate, operationsPeriod),
+    [sessionOperations, operationsDate, operationsPeriod],
+  )
+
+  const serviceData = useMemo(
+    () =>
+      buildRevenueByServiceChart(
+        sessionOperations,
+        serviceDate,
+        servicePeriod,
+        CHART_COLORS,
+        serviceNames,
+      ),
+    [sessionOperations, serviceDate, servicePeriod, serviceNames],
+  )
+
+  const peakData = useMemo(
+    () =>
+      peakPeriod === "daily"
+        ? buildPeakHoursChart(sessionOperations, peakDate)
+        : buildPeakDaysChart(sessionOperations, peakDate),
+    [sessionOperations, peakDate, peakPeriod],
+  )
+
   const revenueData = generateRevenueData(revenueDate, revenuePeriod)
   const satisfactionData = generateSatisfactionData(satisfactionYear)
-  const peakData = peakPeriod === "daily" 
-    ? generatePeakHoursDaily(peakDate) 
-    : generatePeakDaysMonthly(peakDate)
 
   // Summary calculations
   const totalRevenue = revenueData.reduce((sum, item) => sum + item.ciro, 0)
   const totalNet = revenueData.reduce((sum, item) => sum + item.net, 0)
-  const totalOperations = employeeData.reduce((sum, item) => sum + item.islem, 0)
+  const totalOperations = countCompletedInRange(sessionOperations, employeeDate, employeePeriod)
   const avgSatisfaction = (satisfactionData.reduce((sum, item) => sum + item.memnuniyet, 0) / satisfactionData.length).toFixed(1)
 
+  const chartUid = useId().replace(/:/g, "")
+  const employeeChartHeight = staffChartHeight(employeeData.length)
+  const durationChartHeight = staffChartHeight(durationData.length)
+
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6 min-w-0 overflow-x-hidden">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Performans</h1>
-        <p className="text-muted-foreground mt-1">Salon performansinizi detayli grafiklerle takip edin</p>
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Performans</h1>
+          <p className="text-muted-foreground mt-1">
+            Salon performansinizi detayli grafiklerle takip edin
+            {isLoadingSessions ? " · Seans verileri yukleniyor..." : ""}
+          </p>
+        </div>
+
+        <PerformanceExportPanel
+          className="w-full lg:max-w-md shrink-0"
+          businessUserId={businessUserId}
+          shopName={shopName}
+          sessionOperations={sessionOperations}
+          staffNames={staffNames}
+          serviceNames={serviceNames}
+          palette={CHART_COLORS}
+          isLoading={isLoadingSessions}
+        />
       </div>
 
       {/* Ozet Kartlar */}
@@ -448,9 +518,9 @@ export function PerformanceView() {
       </div>
 
       {/* Grafik Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 min-w-0">
         {/* Calisan Performansi */}
-        <Card className="rounded-2xl border-border/50">
+        <Card className="rounded-2xl border-border/50 min-w-0 overflow-hidden">
           <CardHeader className="pb-2">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
@@ -470,32 +540,44 @@ export function PerformanceView() {
               />
             </div>
           </CardHeader>
-          <CardContent>
-            <ChartContainer
-              config={{
-                islem: { label: "Islem", color: COLORS.primary },
-              }}
-              className="h-[280px]"
+          <CardContent className="min-w-0">
+            <PerformanceChartFrame
+              config={{ islem: { label: "Islem", color: COLORS.primary } }}
+              height={employeeChartHeight}
             >
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={employeeData} layout="vertical" margin={{ left: 20, right: 20 }}>
-                  <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
-                  <XAxis type="number" tick={{ fontSize: 12 }} />
-                  <YAxis dataKey="name" type="category" tick={{ fontSize: 12 }} width={70} />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Bar dataKey="islem" radius={[0, 6, 6, 0]}>
-                    {employeeData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.renk} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </ChartContainer>
+              <BarChart
+                data={employeeData}
+                layout="vertical"
+                margin={{ top: 8, right: 16, left: 8, bottom: 8 }}
+                barCategoryGap="20%"
+              >
+                <CartesianGrid strokeDasharray="3 3" horizontal vertical={false} />
+                <XAxis
+                  type="number"
+                  tick={{ fontSize: 11 }}
+                  domain={[0, employeeChartMax]}
+                  allowDecimals={false}
+                />
+                <YAxis
+                  dataKey="name"
+                  type="category"
+                  tick={{ fontSize: 11 }}
+                  width={112}
+                  tickMargin={6}
+                />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <Bar dataKey="islem" maxBarSize={28} radius={[0, 6, 6, 0]}>
+                  {employeeData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.renk} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </PerformanceChartFrame>
           </CardContent>
         </Card>
 
         {/* Ortalama Islem Sureleri */}
-        <Card className="rounded-2xl border-border/50">
+        <Card className="rounded-2xl border-border/50 min-w-0 overflow-hidden">
           <CardHeader className="pb-2">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
@@ -516,31 +598,36 @@ export function PerformanceView() {
               />
             </div>
           </CardHeader>
-          <CardContent>
-            <ChartContainer
+          <CardContent className="min-w-0">
+            <PerformanceChartFrame
               config={{
                 sure: { label: "Ortalama Sure", color: COLORS.secondary },
                 hedef: { label: "Hedef Sure", color: COLORS.tertiary },
               }}
-              className="h-[280px]"
+              height={durationChartHeight}
             >
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={durationData} margin={{ left: 0, right: 20 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                  <YAxis tick={{ fontSize: 12 }} />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Legend />
-                  <Bar dataKey="sure" name="Ortalama" fill={COLORS.secondary} radius={[6, 6, 0, 0]} />
-                  <Bar dataKey="hedef" name="Hedef" fill={COLORS.tertiary} radius={[6, 6, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </ChartContainer>
+              <BarChart data={durationData} margin={{ top: 12, right: 12, left: 4, bottom: 56 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis
+                  dataKey="name"
+                  tick={{ fontSize: 10 }}
+                  interval={0}
+                  angle={-32}
+                  textAnchor="end"
+                  height={56}
+                />
+                <YAxis tick={{ fontSize: 11 }} domain={[0, durationChartMax]} allowDecimals={false} width={36} />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Bar dataKey="sure" name="Ortalama" fill={COLORS.secondary} maxBarSize={32} radius={[6, 6, 0, 0]} />
+                <Bar dataKey="hedef" name="Hedef" fill={COLORS.tertiary} maxBarSize={32} radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </PerformanceChartFrame>
           </CardContent>
         </Card>
 
         {/* Islem Grafigi */}
-        <Card className="rounded-2xl border-border/50">
+        <Card className="rounded-2xl border-border/50 min-w-0 overflow-hidden">
           <CardHeader className="pb-2">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
@@ -558,55 +645,53 @@ export function PerformanceView() {
               />
             </div>
           </CardHeader>
-          <CardContent>
-            <ChartContainer
+          <CardContent className="min-w-0">
+            <PerformanceChartFrame
               config={{
                 islem: { label: "Islem", color: COLORS.primary },
                 musteri: { label: "Musteri", color: COLORS.secondary },
               }}
-              className="h-[280px]"
+              height={300}
             >
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={getOperationsData().data} margin={{ left: 0, right: 20 }}>
-                  <defs>
-                    <linearGradient id="islemGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={COLORS.primary} stopOpacity={0.3} />
-                      <stop offset="95%" stopColor={COLORS.primary} stopOpacity={0} />
-                    </linearGradient>
-                    <linearGradient id="musteriGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={COLORS.secondary} stopOpacity={0.3} />
-                      <stop offset="95%" stopColor={COLORS.secondary} stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey={getOperationsData().xKey} tick={{ fontSize: 12 }} />
-                  <YAxis tick={{ fontSize: 12 }} />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Legend />
-                  <Area
-                    type="monotone"
-                    dataKey="islem"
-                    name="Islem"
-                    stroke={COLORS.primary}
-                    fill="url(#islemGradient)"
-                    strokeWidth={2}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="musteri"
-                    name="Musteri"
-                    stroke={COLORS.secondary}
-                    fill="url(#musteriGradient)"
-                    strokeWidth={2}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </ChartContainer>
+              <AreaChart data={operationsChart.data} margin={{ top: 8, right: 12, left: 4, bottom: 8 }}>
+                <defs>
+                  <linearGradient id={`${chartUid}-islem`} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor={COLORS.primary} stopOpacity={0.3} />
+                    <stop offset="95%" stopColor={COLORS.primary} stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id={`${chartUid}-musteri`} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor={COLORS.secondary} stopOpacity={0.3} />
+                    <stop offset="95%" stopColor={COLORS.secondary} stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey={operationsChart.xKey} tick={{ fontSize: 10 }} interval="preserveStartEnd" />
+                <YAxis tick={{ fontSize: 11 }} width={40} allowDecimals={false} />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Area
+                  type="monotone"
+                  dataKey="islem"
+                  name="Islem"
+                  stroke={COLORS.primary}
+                  fill={`url(#${chartUid}-islem)`}
+                  strokeWidth={2}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="musteri"
+                  name="Musteri"
+                  stroke={COLORS.secondary}
+                  fill={`url(#${chartUid}-musteri)`}
+                  strokeWidth={2}
+                />
+              </AreaChart>
+            </PerformanceChartFrame>
           </CardContent>
         </Card>
 
         {/* En Cok Kazandiran Islemler */}
-        <Card className="rounded-2xl border-border/50">
+        <Card className="rounded-2xl border-border/50 min-w-0 overflow-hidden">
           <CardHeader className="pb-2">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
@@ -624,55 +709,57 @@ export function PerformanceView() {
               />
             </div>
           </CardHeader>
-          <CardContent>
-            <div className="flex gap-4 h-[260px]">
-              <ChartContainer
-                config={{
-                  kazanc: { label: "Kazanc", color: COLORS.primary },
-                }}
-                className="flex-1 min-w-0"
+          <CardContent className="min-w-0">
+            <div className="flex flex-col lg:flex-row gap-4 min-h-[280px]">
+              <PerformanceChartFrame
+                config={{ kazanc: { label: "Kazanc", color: COLORS.primary } }}
+                height={280}
+                className="lg:flex-1 lg:min-w-[220px]"
               >
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={serviceData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={45}
-                      outerRadius={80}
-                      paddingAngle={2}
-                      dataKey="kazanc"
-                    >
-                      {serviceData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.renk} />
-                      ))}
-                    </Pie>
-                    <ChartTooltip 
-                      content={({ active, payload }) => {
-                        if (active && payload && payload.length) {
-                          return (
-                            <div className="bg-background border border-border rounded-lg p-2 shadow-lg">
-                              <p className="text-sm font-medium">{payload[0].payload.name}</p>
-                              <p className="text-sm text-muted-foreground">
-                                {payload[0].value?.toLocaleString()} TL
-                              </p>
-                            </div>
-                          )
-                        }
-                        return null
-                      }} 
+                <PieChart>
+                  <Pie
+                    data={serviceData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius="48%"
+                    outerRadius="78%"
+                    paddingAngle={2}
+                    dataKey="kazanc"
+                  >
+                    {serviceData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.renk} />
+                    ))}
+                  </Pie>
+                  <ChartTooltip
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        return (
+                          <div className="bg-background border border-border rounded-lg p-2 shadow-lg">
+                            <p className="text-sm font-medium">{payload[0].payload.name}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {Number(payload[0].value ?? 0).toLocaleString("tr-TR")} TL
+                            </p>
+                          </div>
+                        )
+                      }
+                      return null
+                    }}
+                  />
+                </PieChart>
+              </PerformanceChartFrame>
+              <div className="w-full lg:w-44 shrink-0 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-2 content-center">
+                {serviceData.map((item) => (
+                  <div key={item.name} className="flex items-start gap-2 min-w-0">
+                    <div
+                      className="w-2.5 h-2.5 rounded-full shrink-0 mt-1"
+                      style={{ backgroundColor: item.renk }}
                     />
-                  </PieChart>
-                </ResponsiveContainer>
-              </ChartContainer>
-              <div className="w-28 flex flex-col justify-center gap-1 shrink-0 overflow-hidden">
-                {serviceData.slice(0, 5).map((item) => (
-                  <div key={item.name} className="flex items-center gap-1.5">
-                    <div 
-                      className="w-2 h-2 rounded-full shrink-0" 
-                      style={{ backgroundColor: item.renk }} 
-                    />
-                    <span className="text-[10px] text-muted-foreground truncate">{item.name}</span>
+                    <span className="text-xs text-muted-foreground leading-snug break-words">
+                      {item.name}
+                      <span className="block text-foreground font-medium">
+                        {item.kazanc.toLocaleString("tr-TR")} TL
+                      </span>
+                    </span>
                   </div>
                 ))}
               </div>
@@ -681,7 +768,7 @@ export function PerformanceView() {
         </Card>
 
         {/* Ciro ve Net Kazanc */}
-        <Card className="rounded-2xl border-border/50 lg:col-span-2">
+        <Card className="rounded-2xl border-border/50 min-w-0 overflow-hidden xl:col-span-2">
           <CardHeader className="pb-2">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
@@ -701,54 +788,54 @@ export function PerformanceView() {
               />
             </div>
           </CardHeader>
-          <CardContent>
-            <ChartContainer
+          <CardContent className="min-w-0">
+            <PerformanceChartFrame
               config={{
                 ciro: { label: "Ciro", color: COLORS.primary },
                 net: { label: "Net Kazanc", color: COLORS.secondary },
                 gider: { label: "Gider", color: COLORS.quaternary },
               }}
-              className="h-[300px]"
+              height={320}
             >
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={revenueData} margin={{ left: 0, right: 20 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="label" tick={{ fontSize: 12 }} />
-                  <YAxis tick={{ fontSize: 12 }} tickFormatter={(value) => `${value / 1000}K`} />
-                  <ChartTooltip 
-                    content={({ active, payload, label }) => {
-                      if (active && payload && payload.length) {
-                        return (
-                          <div className="bg-background border border-border rounded-lg p-3 shadow-lg">
-                            <p className="text-sm font-medium mb-2">{label}</p>
-                            {payload.map((entry, index) => (
-                              <p key={index} className="text-sm flex items-center gap-2">
-                                <span 
-                                  className="w-2.5 h-2.5 rounded-full" 
-                                  style={{ backgroundColor: entry.color }}
-                                />
-                                <span className="text-muted-foreground">{entry.name}:</span>
-                                <span className="font-medium">{entry.value?.toLocaleString()} TL</span>
-                              </p>
-                            ))}
-                          </div>
-                        )
-                      }
-                      return null
-                    }} 
-                  />
-                  <Legend />
-                  <Bar dataKey="ciro" name="Ciro" fill={COLORS.primary} radius={[6, 6, 0, 0]} />
-                  <Bar dataKey="net" name="Net Kazanc" fill={COLORS.secondary} radius={[6, 6, 0, 0]} />
-                  <Bar dataKey="gider" name="Gider" fill={COLORS.quaternary} radius={[6, 6, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </ChartContainer>
+              <BarChart data={revenueData} margin={{ top: 8, right: 12, left: 4, bottom: 8 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="label" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
+                <YAxis tick={{ fontSize: 11 }} width={48} tickFormatter={(value) => `${value / 1000}K`} />
+                <ChartTooltip
+                  content={({ active, payload, label }) => {
+                    if (active && payload && payload.length) {
+                      return (
+                        <div className="bg-background border border-border rounded-lg p-3 shadow-lg">
+                          <p className="text-sm font-medium mb-2">{label}</p>
+                          {payload.map((entry, index) => (
+                            <p key={index} className="text-sm flex items-center gap-2">
+                              <span
+                                className="w-2.5 h-2.5 rounded-full"
+                                style={{ backgroundColor: entry.color }}
+                              />
+                              <span className="text-muted-foreground">{entry.name}:</span>
+                              <span className="font-medium">
+                                {Number(entry.value ?? 0).toLocaleString("tr-TR")} TL
+                              </span>
+                            </p>
+                          ))}
+                        </div>
+                      )
+                    }
+                    return null
+                  }}
+                />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Bar dataKey="ciro" name="Ciro" fill={COLORS.primary} maxBarSize={40} radius={[6, 6, 0, 0]} />
+                <Bar dataKey="net" name="Net Kazanc" fill={COLORS.secondary} maxBarSize={40} radius={[6, 6, 0, 0]} />
+                <Bar dataKey="gider" name="Gider" fill={COLORS.quaternary} maxBarSize={40} radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </PerformanceChartFrame>
           </CardContent>
         </Card>
 
         {/* Musteri Memnuniyeti ve Geri Donus */}
-        <Card className="rounded-2xl border-border/50">
+        <Card className="rounded-2xl border-border/50 min-w-0 overflow-hidden">
           <CardHeader className="pb-2">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
@@ -773,48 +860,46 @@ export function PerformanceView() {
               />
             </div>
           </CardHeader>
-          <CardContent>
-            <ChartContainer
+          <CardContent className="min-w-0">
+            <PerformanceChartFrame
               config={{
                 memnuniyet: { label: "Memnuniyet", color: COLORS.primary },
                 geriDonus: { label: "Geri Donus %", color: COLORS.purple },
               }}
-              className="h-[280px]"
+              height={300}
             >
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={satisfactionData} margin={{ left: 0, right: 20 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="ay" tick={{ fontSize: 12 }} />
-                  <YAxis yAxisId="left" tick={{ fontSize: 12 }} domain={[3, 5]} />
-                  <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 12 }} domain={[50, 100]} />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Legend />
-                  <Line
-                    yAxisId="left"
-                    type="monotone"
-                    dataKey="memnuniyet"
-                    name="Memnuniyet (5 uzerinden)"
-                    stroke={COLORS.primary}
-                    strokeWidth={2}
-                    dot={{ fill: COLORS.primary, r: 4 }}
-                  />
-                  <Line
-                    yAxisId="right"
-                    type="monotone"
-                    dataKey="geriDonus"
-                    name="Geri Donus (%)"
-                    stroke={COLORS.purple}
-                    strokeWidth={2}
-                    dot={{ fill: COLORS.purple, r: 4 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </ChartContainer>
+              <LineChart data={satisfactionData} margin={{ top: 8, right: 16, left: 4, bottom: 8 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="ay" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
+                <YAxis yAxisId="left" tick={{ fontSize: 11 }} domain={[3, 5]} width={32} />
+                <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} domain={[50, 100]} width={36} />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Line
+                  yAxisId="left"
+                  type="monotone"
+                  dataKey="memnuniyet"
+                  name="Memnuniyet (5 uzerinden)"
+                  stroke={COLORS.primary}
+                  strokeWidth={2}
+                  dot={{ fill: COLORS.primary, r: 3 }}
+                />
+                <Line
+                  yAxisId="right"
+                  type="monotone"
+                  dataKey="geriDonus"
+                  name="Geri Donus (%)"
+                  stroke={COLORS.purple}
+                  strokeWidth={2}
+                  dot={{ fill: COLORS.purple, r: 3 }}
+                />
+              </LineChart>
+            </PerformanceChartFrame>
           </CardContent>
         </Card>
 
         {/* Yogun Saatler / Gunler */}
-        <Card className="rounded-2xl border-border/50">
+        <Card className="rounded-2xl border-border/50 min-w-0 overflow-hidden">
           <CardHeader className="pb-2">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
@@ -861,36 +946,36 @@ export function PerformanceView() {
               />
             </div>
           </CardHeader>
-          <CardContent>
-            <ChartContainer
-              config={{
-                musteri: { label: "Musteri", color: COLORS.tertiary },
-              }}
-              className="h-[280px]"
+          <CardContent className="min-w-0">
+            <PerformanceChartFrame
+              config={{ musteri: { label: "Musteri", color: COLORS.tertiary } }}
+              height={300}
             >
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={peakData} margin={{ left: 0, right: 20 }}>
-                  <defs>
-                    <linearGradient id="peakGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={COLORS.tertiary} stopOpacity={0.4} />
-                      <stop offset="95%" stopColor={COLORS.tertiary} stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey={peakPeriod === "daily" ? "saat" : "gun"} tick={{ fontSize: 11 }} />
-                  <YAxis tick={{ fontSize: 12 }} />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Area
-                    type="monotone"
-                    dataKey="musteri"
-                    name="Musteri Sayisi"
-                    stroke={COLORS.tertiary}
-                    fill="url(#peakGradient)"
-                    strokeWidth={2}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </ChartContainer>
+              <AreaChart data={peakData} margin={{ top: 8, right: 12, left: 4, bottom: 8 }}>
+                <defs>
+                  <linearGradient id={`${chartUid}-peak`} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor={COLORS.tertiary} stopOpacity={0.4} />
+                    <stop offset="95%" stopColor={COLORS.tertiary} stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis
+                  dataKey={peakPeriod === "daily" ? "saat" : "gun"}
+                  tick={{ fontSize: 10 }}
+                  interval={peakPeriod === "daily" ? 1 : 0}
+                />
+                <YAxis tick={{ fontSize: 11 }} width={36} allowDecimals={false} />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <Area
+                  type="monotone"
+                  dataKey="musteri"
+                  name="Musteri Sayisi"
+                  stroke={COLORS.tertiary}
+                  fill={`url(#${chartUid}-peak)`}
+                  strokeWidth={2}
+                />
+              </AreaChart>
+            </PerformanceChartFrame>
           </CardContent>
         </Card>
       </div>

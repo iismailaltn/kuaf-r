@@ -7,6 +7,7 @@ import type { SalonService } from "@/lib/salon-services"
 export function useSalonServices(businessUserId?: string) {
   const [services, setServices] = useState<SalonService[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [reloadTick, setReloadTick] = useState(0)
 
   useEffect(() => {
     let cancelled = false
@@ -37,7 +38,7 @@ export function useSalonServices(businessUserId?: string) {
     return () => {
       cancelled = true
     }
-  }, [businessUserId])
+  }, [businessUserId, reloadTick])
 
   const activeServices = services.filter((service) => service.isActive)
   const serviceNames = activeServices.map((service) => service.name)
@@ -47,5 +48,6 @@ export function useSalonServices(businessUserId?: string) {
     activeServices,
     serviceNames,
     isLoading,
+    reload: () => setReloadTick((value) => value + 1),
   }
 }

@@ -44,12 +44,12 @@ export async function GET(req: Request) {
     const status = (axiosErr as { response?: { status?: number } })?.response?.status
     const data = (axiosErr as { response?: { data?: unknown } })?.response?.data
     return apiJson({
-        ok: false,
-        message: "Google Places ayarlari getirilemedi.",
-        error: axiosErr?.message ?? String(err),
-        upstreamStatus: typeof status === "number" ? status : undefined,
-        upstreamData: data,
-      }, 502)
+      ok: false,
+      message: "Google Places ayarlari getirilemedi.",
+      error: axiosErr?.message ?? String(err),
+      upstreamStatus: typeof status === "number" ? status : undefined,
+      upstreamData: data,
+    }, 502)
   }
 }
 
@@ -62,11 +62,11 @@ export async function PUT(req: Request) {
 
     const body = (await req.json().catch(() => null)) as
       | {
-          placesApiKey?: string
-          apiKey?: string
-          placeId?: string
-          businessUserId?: string | number
-        }
+        placesApiKey?: string
+        apiKey?: string
+        placeId?: string
+        businessUserId?: string | number
+      }
       | null
 
     const businessUserId = getBusinessUserIdFromBody(body)
@@ -102,11 +102,11 @@ export async function PUT(req: Request) {
     const status = (axiosErr as { response?: { status?: number } })?.response?.status
     const data = (axiosErr as { response?: { data?: unknown } })?.response?.data
     return apiJson({
-        ok: false,
-        message: "Google Places ayarlari kaydedilemedi.",
-        error: axiosErr?.message ?? String(err),
-        upstreamStatus: typeof status === "number" ? status : undefined,
-        upstreamData: data,
-      }, 502)
+      ok: false,
+      message: "Google Places ayarlari kaydedilemedi.",
+      error: axiosErr?.message ?? String(err),
+      upstreamStatus: typeof status === "number" ? status : undefined,
+      upstreamData: data,
+    }, 502)
   }
 }

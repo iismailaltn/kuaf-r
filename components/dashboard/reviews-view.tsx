@@ -38,7 +38,7 @@ interface ReviewsViewProps {
 }
 
 export function ReviewsView({ businessUserId }: ReviewsViewProps) {
-  const { settings, isSaving, saveSettings } = useGooglePlaceSettings()
+  const { settings, isSaving, saveSettings } = useGooglePlaceSettings(businessUserId)
   const [apiKey, setApiKey] = useState("")
   const [placeId, setPlaceId] = useState("")
   const [isConnected, setIsConnected] = useState(false)
@@ -82,6 +82,10 @@ export function ReviewsView({ businessUserId }: ReviewsViewProps) {
   }, [settings, loadReviews])
 
   const handleConnect = async () => {
+    if (!businessUserId) {
+      setError("Isletme bilgisi bulunamadi. Lutfen tekrar giris yapin.")
+      return
+    }
     if (!apiKey.trim() || !placeId.trim()) {
       setError("Lutfen API Key ve Place ID alanlarini doldurun.")
       return
@@ -456,11 +460,11 @@ export function ReviewsView({ businessUserId }: ReviewsViewProps) {
             </div>
           </div>
           <p className="text-sm text-muted-foreground">
-            Yapay zeka destekli yorum analizi yakinda aktif olacak. Musteri
-            duygularini ve onemli konulari otomatik olarak analiz edecek.
+            Yapay zeka destekli yorum analizi yakında aktif olacak. Müşteri
+            duygularını ve önemli konuları otomatik olarak analiz edecek.
           </p>
           <Button variant="outline" className="mt-4 rounded-xl w-full" disabled>
-            Yakinda
+            Yakında
           </Button>
         </div>
       </div>

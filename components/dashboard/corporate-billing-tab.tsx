@@ -29,6 +29,7 @@ interface MembershipPayload {
   subscriptionEndsAt: string | null
   isApproved: boolean
   hasSelectedPlan: boolean
+  pendingUpgradeRequest: boolean
   timeRemaining: {
     remainingDays: number
     elapsedPercent: number
@@ -46,6 +47,7 @@ export function CorporateBillingTab({ businessUserId }: CorporateBillingTabProps
   const [isLoading, setIsLoading] = useState(true)
   const [isUpgrading, setIsUpgrading] = useState(false)
   const [upgradeSuccess, setUpgradeSuccess] = useState(false)
+  const [selectedPlan, setSelectedPlan] = useState<MembershipPlan | null>(null)
 
   const loadMembership = useCallback(async () => {
     if (!businessUserId) {
@@ -74,6 +76,12 @@ export function CorporateBillingTab({ businessUserId }: CorporateBillingTabProps
     void loadMembership()
   }, [loadMembership])
 
+  useEffect(() => {
+    if (membership?.membershipPlan) {
+      setSelectedPlan(membership.membershipPlan)
+    }
+  }, [membership?.membershipPlan, membership?.pendingUpgradeRequest])
+
   const handleUpgrade = async () => {
     if (!businessUserId) return
 
@@ -83,16 +91,17 @@ export function CorporateBillingTab({ businessUserId }: CorporateBillingTabProps
       const res = await apiFetch("/api/corporate-membership", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ businessUserId, plan: "professional", action: "upgrade" }),
+        body: JSON.stringify({ businessUserId, plan: "professional", action: "request_upgrade" }),
       })
       const data = await res.json().catch(() => null)
       if (!res.ok || !data?.ok) {
-        alert(data?.message ?? "Paket yukseltilemedi.")
+        alert(data?.message ?? "Paket yükseltme talebi gönderilemedi.")
         return
       }
       setMembership(data.membership ?? null)
       setUpgradeSuccess(true)
-      setTimeout(() => setUpgradeSuccess(false), 3000)
+      alert("Paket yükseltme talebiniz supervisor onayına gönderildi.")
+      setTimeout(() => setUpgradeSuccess(false), 5000)
     } finally {
       setIsUpgrading(false)
     }
@@ -111,9 +120,11 @@ export function CorporateBillingTab({ businessUserId }: CorporateBillingTabProps
   const upgradePlan = getPlanById("professional")
   const showUpgrade = membership?.membershipPlan === "basic" && membership?.isApproved
   const pendingApproval = membership?.hasSelectedPlan && !membership?.isApproved
+  const pendingUpgradeRequest = membership?.pendingUpgradeRequest
   const subscriptionActive = Boolean(membership?.timeRemaining?.isActive && !membership?.timeRemaining?.isExpired)
   const progressPercent = membership?.timeRemaining?.elapsedPercent ?? 0
   const remainingDays = membership?.timeRemaining?.remainingDays ?? 0
+  const plans = MEMBERSHIP_PLANS
 
   return (
     <div className="space-y-6">
@@ -148,168 +159,155 @@ export function CorporateBillingTab({ businessUserId }: CorporateBillingTabProps
         </Card>
       )}
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        <Card className={cn("xl:col-span-2", currentPlan && "border-primary/30")}>
-          <CardHeader>
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <CardTitle className="text-xl">Aktif Paketiniz</CardTitle>
-                <CardDescription className="mt-1">Yıllık üyelik planı</CardDescription>
-              </div>
-              <Badge variant={membership?.isApproved ? "default" : "secondary"}>
-                {membership?.isApproved ? "Onaylandı" : "Onay bekliyor"}
-              </Badge>
+      {pendingUpgradeRequest && (
+        <Card className="border-blue-500/30 bg-blue-500/5">
+          <CardContent className="flex items-start gap-4 pt-6">
+            <div className="w-10 h-10 rounded-xl bg-blue-500/15 flex items-center justify-center shrink-0">
+              <Clock3 className="w-5 h-5 text-blue-600" />
             </div>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {currentPlan ? (
-              <>
-                <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
-                  <div>
-                    <p className="text-3xl font-bold text-foreground">{currentPlan.title}</p>
-                    <p className="text-sm text-muted-foreground mt-1">{currentPlan.description}</p>
-                  </div>
-                  <div className="text-left sm:text-right">
-                    <p className="text-3xl font-bold text-foreground">{currentPlan.price}</p>
-                    <p className="text-sm text-muted-foreground">/ yıl</p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {currentPlan.features.map((feature) => (
-                    <div key={feature} className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
-                      <span>{feature}</span>
-                    </div>
-                  ))}
-                </div>
-              </>
-            ) : (
-              <p className="text-sm text-muted-foreground">Henüz bir paket seçilmedi.</p>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Üyelik Süresi</CardTitle>
-            <CardDescription>
-              {subscriptionActive
-                ? "Yıllık abonelik aktif"
-                : membership?.isApproved
-                  ? "Süre bilgisi yükleniyor"
-                  : "Onay sonrası başlar"}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            {membership?.subscriptionStartsAt && membership?.subscriptionEndsAt ? (
-              <>
-                <div className="rounded-xl bg-muted/50 p-4 space-y-3">
-                  <div className="flex items-center gap-2 text-sm">
-                    <CalendarDays className="w-4 h-4 text-primary" />
-                    <span className="text-muted-foreground">Başlangıç</span>
-                    <span className="ml-auto font-medium text-foreground">
-                      {formatMembershipDate(membership.subscriptionStartsAt)}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm">
-                    <ShieldCheck className="w-4 h-4 text-primary" />
-                    <span className="text-muted-foreground">Bitiş</span>
-                    <span className="ml-auto font-medium text-foreground">
-                      {formatMembershipDate(membership.subscriptionEndsAt)}
-                    </span>
-                  </div>
-                </div>
-
-                {membership.timeRemaining && (
-                  <>
-                    <div>
-                      <div className="flex items-center justify-between text-sm mb-2">
-                        <span className="text-muted-foreground">Kalan süre</span>
-                        <span className="font-semibold text-foreground">
-                          {membership.timeRemaining.isExpired ? "Süresi doldu" : `${remainingDays} gün`}
-                        </span>
-                      </div>
-                      <div className="h-2.5 rounded-full bg-muted overflow-hidden">
-                        <div
-                          className={cn(
-                            "h-full rounded-full transition-all",
-                            membership.timeRemaining.isExpired ? "bg-destructive w-full" : "bg-primary",
-                          )}
-                          style={{ width: `${membership.timeRemaining.isExpired ? 100 : progressPercent}%` }}
-                        />
-                      </div>
-                    </div>
-                    {!membership.timeRemaining.isExpired && (
-                      <p className="text-xs text-muted-foreground">
-                        Yıllık üyeliğinizin %{Math.round(progressPercent)} tamamlandı.
-                      </p>
-                    )}
-                  </>
-                )}
-              </>
-            ) : (
-              <div className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">
-                Supervisor kurumsal başvurunuzu onayladığında 1 yıllık süre otomatik olarak başlayacaktır.
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {showUpgrade && upgradePlan && (
-        <Card className="border-primary/20 bg-gradient-to-br from-primary/5 via-card to-card">
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-primary" />
-              <CardTitle className="text-xl">Profesyonel Pakete Geçmek İster misiniz?</CardTitle>
-            </div>
-            <CardDescription>
-              Başlangıç paketinden profesyonel pakete geçerek gelişmiş özelliklere erişebilirsiniz.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-col lg:flex-row lg:items-center gap-6">
-              <div className="flex-1 space-y-3">
-                <div className="flex items-baseline gap-2">
-                  <span className="text-3xl font-bold text-foreground">{upgradePlan.price}</span>
-                  <span className="text-muted-foreground">/ yıl</span>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {upgradePlan.features.map((feature) => (
-                    <div key={feature} className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
-                      <span>{feature}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <Button
-                className="rounded-xl h-11 px-6 shrink-0"
-                onClick={() => void handleUpgrade()}
-                disabled={isUpgrading}
-              >
-                {isUpgrading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Guncelleniyor...
-                  </>
-                ) : upgradeSuccess ? (
-                  <>
-                    <CheckCircle2 className="w-4 h-4 mr-2" />
-                    Paket guncellendi
-                  </>
-                ) : (
-                  <>
-                    Profesyonel Pakete Geç
-                    <ArrowUpRight className="w-4 h-4 ml-2" />
-                  </>
-                )}
-              </Button>
+            <div>
+              <p className="font-medium text-foreground">Paket yükseltme talebiniz işleme alındı</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Talep edilen paket: <span className="font-medium text-foreground">{upgradePlan?.title ?? "—"}</span>.
+                Supervisor onayından sonra paketiniz yükseltilecektir.
+              </p>
             </div>
           </CardContent>
         </Card>
       )}
+
+      <div className="mx-auto mt-8 grid max-w-lg grid-cols-1 items-center gap-y-6 sm:mt-12 sm:gap-y-0 lg:max-w-4xl lg:grid-cols-2">
+        {plans.map((plan, tierIdx) => (
+          <div
+            key={plan.id}
+            className={`
+              relative rounded-3xl p-8 ring-1 ring-border sm:p-10 cursor-pointer
+              ${selectedPlan === plan.id ? 'bg-primary text-primary-foreground shadow-2xl' : 'bg-card/60 sm:mx-8 lg:mx-0'}
+              ${selectedPlan !== plan.id && tierIdx === 0 ? 'rounded-t-3xl sm:rounded-b-none lg:rounded-tr-none lg:rounded-bl-3xl' : ''}
+              ${selectedPlan !== plan.id && tierIdx === 1 ? 'sm:rounded-t-none lg:rounded-tr-3xl lg:rounded-bl-none' : ''}
+            `}
+          >
+            {pendingUpgradeRequest && plan.id === 'professional' && (
+              <Badge className="absolute top-4 right-4 bg-blue-500 text-white">
+                Bekleniyor..
+              </Badge>
+            )}
+            <h3 className={`text-base/7 font-semibold ${selectedPlan === plan.id ? 'text-primary-foreground' : 'text-primary'}`}>
+              {plan.title}
+            </h3>
+            <p className="mt-4 flex items-baseline gap-x-2">
+              <span className={`text-5xl font-semibold tracking-tight ${selectedPlan === plan.id ? 'text-primary-foreground' : 'text-foreground'}`}>
+                {plan.price}
+              </span>
+              <span className={`text-base ${selectedPlan === plan.id ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>/yıl</span>
+            </p>
+            <p className={`mt-6 text-base/7 ${selectedPlan === plan.id ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}>
+              {plan.description}
+            </p>
+            <ul role="list" className={`mt-8 space-y-3 text-sm/6 sm:mt-10 ${selectedPlan === plan.id ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}>
+              {plan.features.map((feature) => (
+                <li key={feature} className="flex gap-x-3">
+                  <CheckCircle2
+                    className={`h-6 w-5 flex-none ${selectedPlan === plan.id ? 'text-primary-foreground' : 'text-primary'}`}
+                  />
+                  {feature}
+                </li>
+              ))}
+            </ul>
+            {!(selectedPlan === 'professional' && plan.id === 'basic') && (
+              <Button
+                onClick={() => {
+                  if (membership?.isApproved && selectedPlan !== plan.id) {
+                    void handleUpgrade()
+                  }
+                }}
+                className={`
+                  mt-8 block w-full rounded-xl px-3.5 py-2.5 text-center text-sm font-semibold sm:mt-10
+                  ${selectedPlan === plan.id
+                    ? 'bg-primary-foreground text-primary hover:bg-primary-foreground/90'
+                    : 'bg-primary text-primary-foreground hover:bg-primary/90'
+                  }
+                `}
+                disabled={!membership?.isApproved || selectedPlan === plan.id || isUpgrading || pendingUpgradeRequest}
+              >
+                {selectedPlan === plan.id
+                  ? 'Seçildi'
+                  : (!membership?.isApproved
+                    ? 'Onay Bekliyor'
+                    : (pendingUpgradeRequest
+                      ? 'Talep İşleniyor'
+                      : 'Bu Paketi Seç'))}
+              </Button>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Üyelik Süresi</CardTitle>
+          <CardDescription>
+            {subscriptionActive
+              ? "Yıllık abonelik aktif"
+              : membership?.isApproved
+                ? "Süre bilgisi yükleniyor"
+                : "Onay sonrası başlar"}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          {membership?.subscriptionStartsAt && membership?.subscriptionEndsAt ? (
+            <>
+              <div className="rounded-xl bg-muted/50 p-4 space-y-3">
+                <div className="flex items-center gap-2 text-sm">
+                  <CalendarDays className="w-4 h-4 text-primary" />
+                  <span className="text-muted-foreground">Başlangıç</span>
+                  <span className="ml-auto font-medium text-foreground">
+                    {formatMembershipDate(membership.subscriptionStartsAt)}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <ShieldCheck className="w-4 h-4 text-primary" />
+                  <span className="text-muted-foreground">Bitiş</span>
+                  <span className="ml-auto font-medium text-foreground">
+                    {formatMembershipDate(membership.subscriptionEndsAt)}
+                  </span>
+                </div>
+              </div>
+
+              {membership.timeRemaining && (
+                <>
+                  <div>
+                    <div className="flex items-center justify-between text-sm mb-2">
+                      <span className="text-muted-foreground">Kalan süre</span>
+                      <span className="font-semibold text-foreground">
+                        {membership.timeRemaining.isExpired ? "Süresi doldu" : `${remainingDays} gün`}
+                      </span>
+                    </div>
+                    <div className="h-2.5 rounded-full bg-muted overflow-hidden">
+                      <div
+                        className={cn(
+                          "h-full rounded-full transition-all",
+                          membership.timeRemaining.isExpired ? "bg-destructive w-full" : "bg-primary",
+                        )}
+                        style={{ width: `${membership.timeRemaining.isExpired ? 100 : progressPercent}%` }}
+                      />
+                    </div>
+                  </div>
+                  {!membership.timeRemaining.isExpired && (
+                    <p className="text-xs text-muted-foreground">
+                      Yıllık üyeliğinizin %{Math.round(progressPercent)} tamamlandı.
+                    </p>
+                  )}
+                </>
+              )}
+            </>
+          ) : (
+            <div className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">
+              Supervisor kurumsal başvurunuzu onayladığında 1 yıllık süre otomatik olarak başlayacaktır.
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {membership?.membershipPlan === "professional" && (
         <Card className="border-emerald-500/20 bg-emerald-500/5">

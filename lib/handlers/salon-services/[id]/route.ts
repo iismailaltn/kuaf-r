@@ -1,18 +1,11 @@
 import type { AxiosError } from "axios"
 import { appConfig } from "@/app.config"
-import { selectByToken, sqlToken } from "@/lib/services/locofabric-database"
+import { extractRows, selectAllByToken, sqlToken } from "@/lib/services/locofabric-database"
 import { getBusinessUserIdFromBody, requireBusinessUserId } from "@/lib/business-scope"
 import { apiJson } from "@/lib/api-response"
 
 function sanitizeSqlString(input: string) {
   return input.replace(/'/g, "''")
-}
-
-function extractRows(data: any): any[] {
-  return Array.isArray((data as any)?.data) ? (data as any).data :
-    Array.isArray((data as any)?.Data) ? (data as any).Data :
-    Array.isArray(data) ? data :
-    []
 }
 
 export async function PUT(
@@ -26,10 +19,10 @@ export async function PUT(
       return apiJson({ ok: false, message: "Gecersiz hizmet id." }, 400)
     }
 
-    const masterToken = appConfig.token.salonservis
+    const masterToken = appConfig.token.expertise_areas
     const settingsToken = appConfig.token.business_service_settings
     if (!masterToken) {
-      return apiJson({ ok: false, message: "salonservis token tanimli degil." }, 500)
+      return apiJson({ ok: false, message: "expertise_areas token tanimli degil." }, 500)
     }
     if (!settingsToken) {
       return apiJson({ ok: false, message: "business_service_settings token tanimli degil." }, 500)
@@ -37,14 +30,14 @@ export async function PUT(
 
     const body = (await req.json().catch(() => null)) as
       | {
-          name?: string
-          description?: string | null
-          category?: string
-          durationMinutes?: number | string
-          price?: number | string
-          isActive?: boolean
-          businessUserId?: string | number
-        }
+        name?: string
+        description?: string | null
+        category?: string
+        durationMinutes?: number | string
+        price?: number | string
+        isActive?: boolean
+        businessUserId?: string | number
+      }
       | null
 
     const businessUserId = getBusinessUserIdFromBody(body)
@@ -59,7 +52,7 @@ export async function PUT(
     }
     const isActive = body?.isActive === false ? 0 : 1
 
-    const masterData = await selectByToken<any>(masterToken)
+    const masterData = await selectAllByToken<any>(masterToken, "expertise_areas")
     const masterRows = extractRows(masterData)
     const masterService = masterRows.find((row) => String(row.id ?? row.ID ?? "").trim() === String(idNum))
     const serviceName = sanitizeSqlString(String(masterService?.name ?? body?.name ?? "").trim())
@@ -67,7 +60,7 @@ export async function PUT(
       return apiJson({ ok: false, message: "Hizmet bulunamadi." }, 404)
     }
 
-    const settingsData = await selectByToken<any>(settingsToken)
+    const settingsData = await selectAllByToken<any>(settingsToken, "business_service_settings")
     const existing = extractRows(settingsData).find((row) => {
       const rowBusinessUserId = String(row.business_user_id ?? row.businessUserId ?? "").trim()
       const serviceId = String(row.service_id ?? row.serviceId ?? "").trim()
@@ -93,11 +86,11 @@ export async function PUT(
     const status = (axiosErr as { response?: { status?: number } })?.response?.status
     const data = (axiosErr as { response?: { data?: unknown } })?.response?.data
     return apiJson({
-        ok: false,
-        message: "Salon hizmeti guncellenemedi.",
-        error: axiosErr?.message ?? String(err),
-        upstreamStatus: typeof status === "number" ? status : undefined,
-        upstreamData: data,
-      }, 502)
+      ok: false,
+      message: "Salon hizmeti guncellenemedi.",
+      error: axiosErr?.message ?? String(err),
+      upstreamStatus: typeof status === "number" ? status : undefined,
+      upstreamData: data,
+    }, 502)
   }
 }

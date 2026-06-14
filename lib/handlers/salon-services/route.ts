@@ -1,53 +1,66 @@
 import type { AxiosError } from "axios"
 import { appConfig } from "@/app.config"
-import { selectByToken } from "@/lib/services/locofabric-database"
-import { normalizeSalonServiceRows, type SalonServiceRow } from "@/lib/salon-services"
+import { fetchStagesByServiceForBusiness } from "@/lib/business-service-stages-db"
+import { extractRows, selectAllByToken } from "@/lib/services/locofabric-database"
+import {
+  getAllowedCategoriesForSection,
+  matchesCategoryExact,
+  normalizeCategoryKey,
+} from "@/lib/salon-service-catalog"
+import { groupSalonServicesByCategory, normalizeSalonServiceRows, type SalonServiceRow } from "@/lib/salon-services"
+import { mergeMasterServiceWithBusinessData } from "@/lib/salon-service-settings"
 import { getBusinessUserIdFromRequest } from "@/lib/business-scope"
 import { apiJson } from "@/lib/api-response"
-
-function extractRows(data: unknown) {
-  if (Array.isArray((data as { data?: unknown })?.data)) {
-    return (data as { data: SalonServiceRow[] }).data
-  }
-  if (Array.isArray((data as { Data?: unknown })?.Data)) {
-    return (data as { Data: SalonServiceRow[] }).Data
-  }
-  if (Array.isArray(data)) {
-    return data as SalonServiceRow[]
-  }
-  return []
-}
 
 export async function GET(req: Request) {
   try {
     const businessUserId = getBusinessUserIdFromRequest(req)
 
-    const token = appConfig.token.salonservis
+    const token = appConfig.token.expertise_areas
     if (!token) {
-      return apiJson({ ok: false, message: "salonservis token tanimli degil." }, 500)
+      return apiJson({ ok: false, message: "expertise_areas token tanimli degil." }, 500)
     }
 
-    const data = await selectByToken<unknown>(token)
-    const rawRows = extractRows(data)
-    const masterRows = normalizeSalonServiceRows(rawRows)
+    const data = await selectAllByToken<unknown>(token, "expertise_areas")
+    const rawRows = extractRows<SalonServiceRow>(data)
+    const allMasterRows = normalizeSalonServiceRows(rawRows)
+    const groups = groupSalonServicesByCategory(allMasterRows)
+
+    const url = new URL(req.url)
+    const category = url.searchParams.get("category")?.trim() ?? ""
+    const catalogSection = url.searchParams.get("catalogSection")?.trim() ?? ""
+
+    let masterRows = allMasterRows
+    if (category) {
+      masterRows = masterRows.filter(
+        (row) => normalizeCategoryKey(row.category) === normalizeCategoryKey(category),
+      )
+    } else if (catalogSection) {
+      const allowedCategories = getAllowedCategoriesForSection(catalogSection)
+      masterRows = masterRows.filter((row) => matchesCategoryExact(row.category, allowedCategories))
+    }
 
     if (!businessUserId) {
-      return apiJson({ ok: true, rows: masterRows })
+      return apiJson({ ok: true, rows: masterRows, total: masterRows.length, groups })
     }
 
     const settingsToken = appConfig.token.business_service_settings
+    const stagesToken = appConfig.token.business_service_stages
     if (!settingsToken) {
       return apiJson({ ok: false, message: "business_service_settings token tanimli degil." }, 500)
     }
+    if (!stagesToken) {
+      return apiJson({ ok: false, message: "business_service_stages token tanimli degil." }, 500)
+    }
 
-    const settingsData = await selectByToken<any>(settingsToken)
-    const settingsRows =
-      Array.isArray((settingsData as any)?.data) ? (settingsData as any).data :
-      Array.isArray((settingsData as any)?.Data) ? (settingsData as any).Data :
-      Array.isArray(settingsData) ? settingsData :
-      []
+    const [settingsData, stagesByServiceId] = await Promise.all([
+      selectAllByToken<unknown>(settingsToken, "business_service_settings"),
+      fetchStagesByServiceForBusiness(stagesToken, businessUserId),
+    ])
 
-    const settingsByServiceId = new Map<string, any>()
+    const settingsRows = extractRows<Record<string, unknown>>(settingsData)
+
+    const settingsByServiceId = new Map<string, Record<string, unknown>>()
     for (const row of settingsRows) {
       const rowBusinessUserId = String(row.business_user_id ?? row.businessUserId ?? "").trim()
       const serviceId = String(row.service_id ?? row.serviceId ?? "").trim()
@@ -57,35 +70,29 @@ export async function GET(req: Request) {
     }
 
     const rows = masterRows.map((service) => {
-      const setting = settingsByServiceId.get(String(service.id))
-      if (!setting) {
-        return {
-          ...service,
-          price: 0,
-          isActive: false,
-        }
-      }
-
-      const price = Number(setting.price ?? 0)
-      const isActiveValue = setting.is_active ?? setting.isActive
+      const merged = mergeMasterServiceWithBusinessData(
+        service,
+        settingsByServiceId.get(String(service.id)),
+        stagesByServiceId,
+      )
       return {
         ...service,
-        price: Number.isFinite(price) ? price : 0,
-        isActive: isActiveValue === true || isActiveValue === 1 || isActiveValue === "1" || isActiveValue === "true",
+        ...merged,
+        category: service.category,
       }
     })
 
-    return apiJson({ ok: true, rows })
+    return apiJson({ ok: true, rows, total: rows.length, groups })
   } catch (err) {
     const axiosErr = err as AxiosError | undefined
     const status = (axiosErr as { response?: { status?: number } })?.response?.status
     const data = (axiosErr as { response?: { data?: unknown } })?.response?.data
     return apiJson({
-        ok: false,
-        message: "Salon hizmetleri getirilemedi.",
-        error: axiosErr?.message ?? String(err),
-        upstreamStatus: typeof status === "number" ? status : undefined,
-        upstreamData: data,
-      }, 502)
+      ok: false,
+      message: "Salon hizmetleri getirilemedi.",
+      error: axiosErr?.message ?? String(err),
+      upstreamStatus: typeof status === "number" ? status : undefined,
+      upstreamData: data,
+    }, 502)
   }
 }

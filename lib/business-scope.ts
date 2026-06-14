@@ -38,7 +38,11 @@ function getField(row: any, candidates: string[]) {
   return undefined
 }
 
-export function matchesBusinessUserId(row: any, businessUserId: string) {
+function normalizeBusinessUserIdForMatch(value: string) {
+  return value.trim().toLowerCase().replace(/[{}]/g, "")
+}
+
+export function getBusinessUserIdFromRow(row: unknown) {
   const explicitValue = getField(row, [
     "business_user_id",
     "businessUserId",
@@ -48,15 +52,30 @@ export function matchesBusinessUserId(row: any, businessUserId: string) {
     "businessId",
   ])
 
-  const fallbackValue = row && typeof row === "object"
-    ? Object.entries(row as Record<string, unknown>).find(([key]) => {
-        const normalizedKey = normalizeKey(key)
-        return normalizedKey.includes("business") && normalizedKey.includes("user")
-      })?.[1]
-    : undefined
+  const fallbackValue =
+    row && typeof row === "object"
+      ? Object.entries(row as Record<string, unknown>).find(([key]) => {
+          const normalizedKey = normalizeKey(key)
+          return normalizedKey.includes("business") && normalizedKey.includes("user")
+        })?.[1]
+      : undefined
 
-  const value = String(explicitValue ?? fallbackValue ?? "").trim()
-  return value === businessUserId || Number(value) === Number(businessUserId)
+  return String(explicitValue ?? fallbackValue ?? "").trim()
+}
+
+export function matchesBusinessUserId(row: any, businessUserId: string) {
+  const value = getBusinessUserIdFromRow(row)
+  if (!value) {
+    return false
+  }
+
+  const left = normalizeBusinessUserIdForMatch(value)
+  const right = normalizeBusinessUserIdForMatch(businessUserId)
+  if (!left || !right) {
+    return false
+  }
+
+  return left === right || Number(left) === Number(right)
 }
 
 export function requireBusinessUserId(value: string) {

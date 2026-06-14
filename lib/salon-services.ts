@@ -1,3 +1,5 @@
+import type { SalonServiceStage } from "@/lib/salon-service-stages"
+
 export type SalonServiceRow = {
   id?: number | string
   name?: string
@@ -22,6 +24,7 @@ export type SalonService = {
   durationMinutes: number
   price: number
   isActive: boolean
+  stages: SalonServiceStage[]
   createdAt: string
   updatedAt: string
 }
@@ -58,6 +61,7 @@ export function normalizeSalonServiceRow(row: SalonServiceRow): SalonService | n
     durationMinutes: toNumber(row.duration_minutes ?? row.durationMinutes),
     price: toNumber(row.price),
     isActive: toBoolean(row.is_active ?? row.isActive ?? true),
+    stages: [],
     createdAt: toStringValue(row.created_at ?? row.createdAt),
     updatedAt: toStringValue(row.updated_at ?? row.updatedAt),
   }
@@ -68,4 +72,17 @@ export function normalizeSalonServiceRows(rows: SalonServiceRow[]) {
     .map((row) => normalizeSalonServiceRow(row))
     .filter((row): row is SalonService => row !== null)
     .sort((a, b) => a.name.localeCompare(b.name, "tr"))
+}
+
+export function groupSalonServicesByCategory(services: SalonService[]) {
+  const groups = new Map<string, SalonService[]>()
+  for (const service of services) {
+    const category = service.category.trim() || "Diger"
+    const bucket = groups.get(category) ?? []
+    bucket.push(service)
+    groups.set(category, bucket)
+  }
+  return Object.fromEntries(
+    [...groups.entries()].sort(([a], [b]) => a.localeCompare(b, "tr")),
+  )
 }

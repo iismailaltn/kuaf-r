@@ -1,6 +1,9 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useMemo, useState } from "react"
+import { useReservations } from "@/hooks/use-reservations"
+import type { ReservationStatus } from "@/lib/reservations-store"
+import { reservationRowKey } from "@/lib/reservations-db"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
@@ -18,13 +21,15 @@ import {
   XCircle,
   AlertCircle,
   Globe,
+  MessageCircle,
   Filter,
 } from "lucide-react"
 
-interface Reservation {
+type Reservation = {
   id: string
   date: string
   time: string
+  endTime?: string
   customerName: string
   customerSurname: string
   phone: string
@@ -32,131 +37,10 @@ interface Reservation {
   staffId: string
   staffName: string
   notes: string
-  source: "website" | "manual"
-  status: "pending" | "confirmed" | "completed" | "cancelled"
+  source: "website" | "manual" | "whatsapp"
+  status: ReservationStatus
 }
 
-// Ornek personel - gercek uygulamada login olan kullanicinin bilgileri gelecek
-const currentStaff = {
-  id: "EMP001",
-  name: "Ahmet Yilmaz",
-}
-
-// Ornek rezervasyonlar - bu calisan icin
-const initialReservations: Reservation[] = [
-  {
-    id: "RES001",
-    date: "2026-04-26",
-    time: "09:00",
-    customerName: "Mehmet",
-    customerSurname: "Kaya",
-    phone: "0532 111 22 33",
-    services: ["Sac Kesimi"],
-    staffId: "EMP001",
-    staffName: "Ahmet Yilmaz",
-    notes: "Kisa kesim istiyor",
-    source: "website",
-    status: "confirmed",
-  },
-  {
-    id: "RES002",
-    date: "2026-04-26",
-    time: "10:30",
-    customerName: "Ali",
-    customerSurname: "Demir",
-    phone: "0533 444 55 66",
-    services: ["Sakal Kesimi", "Sac Kesimi"],
-    staffId: "EMP001",
-    staffName: "Ahmet Yilmaz",
-    notes: "",
-    source: "manual",
-    status: "pending",
-  },
-  {
-    id: "RES003",
-    date: "2026-04-28",
-    time: "14:00",
-    customerName: "Hasan",
-    customerSurname: "Celik",
-    phone: "0534 777 88 99",
-    services: ["Sac Kesimi"],
-    staffId: "EMP001",
-    staffName: "Ahmet Yilmaz",
-    notes: "Dugun icin ozel istek",
-    source: "website",
-    status: "confirmed",
-  },
-  {
-    id: "RES004",
-    date: "2026-04-30",
-    time: "11:00",
-    customerName: "Yusuf",
-    customerSurname: "Ozturk",
-    phone: "0535 123 45 67",
-    services: ["Sac Kesimi", "Sakal Kesimi"],
-    staffId: "EMP001",
-    staffName: "Ahmet Yilmaz",
-    notes: "",
-    source: "manual",
-    status: "confirmed",
-  },
-  {
-    id: "RES005",
-    date: "2026-05-02",
-    time: "15:30",
-    customerName: "Emre",
-    customerSurname: "Aydin",
-    phone: "0536 987 65 43",
-    services: ["Sac Kesimi"],
-    staffId: "EMP001",
-    staffName: "Ahmet Yilmaz",
-    notes: "Ilk kez geliyor",
-    source: "website",
-    status: "pending",
-  },
-  {
-    id: "RES006",
-    date: "2026-05-05",
-    time: "10:00",
-    customerName: "Kemal",
-    customerSurname: "Yildiz",
-    phone: "0537 111 22 33",
-    services: ["Sakal Kesimi"],
-    staffId: "EMP001",
-    staffName: "Ahmet Yilmaz",
-    notes: "",
-    source: "manual",
-    status: "confirmed",
-  },
-  {
-    id: "RES007",
-    date: "2026-05-10",
-    time: "09:30",
-    customerName: "Burak",
-    customerSurname: "Sahin",
-    phone: "0538 222 33 44",
-    services: ["Sac Kesimi", "Sakal Kesimi"],
-    staffId: "EMP001",
-    staffName: "Ahmet Yilmaz",
-    notes: "Her ay gelir",
-    source: "website",
-    status: "confirmed",
-  },
-  {
-    id: "RES008",
-    date: "2026-05-15",
-    time: "16:00",
-    customerName: "Okan",
-    customerSurname: "Koc",
-    phone: "0539 333 44 55",
-    services: ["Sac Kesimi"],
-    staffId: "EMP001",
-    staffName: "Ahmet Yilmaz",
-    notes: "",
-    source: "manual",
-    status: "pending",
-  },
-]
 
 const turkishMonths = [
   "Ocak", "Subat", "Mart", "Nisan", "Mayis", "Haziran",
@@ -194,15 +78,42 @@ const statusConfig = {
 }
 
 interface MyReservationsViewProps {
-  staffId?: string
+  businessUserId?: string
+  /** Giris yapan bireysel kullanicinin users.id degeri */
+  individualUserId?: string
   staffName?: string
 }
 
-export function MyReservationsView({ 
-  staffId = currentStaff.id, 
-  staffName = currentStaff.name 
+export function MyReservationsView({
+  businessUserId,
+  individualUserId,
+  staffName = "Personel",
 }: MyReservationsViewProps) {
-  const [reservations, setReservations] = useState<Reservation[]>(initialReservations)
+  const { reservations: apiRows, isLoading, error, updateReservationStatus } = useReservations(
+    businessUserId,
+    individualUserId,
+  )
+
+  const reservations: Reservation[] = useMemo(() => {
+    if (apiRows.length > 0) {
+      return apiRows.map((row) => ({
+        id: row.id,
+        date: row.date,
+        time: row.startTime,
+        endTime: row.endTime,
+        customerName: row.customerName,
+        customerSurname: row.customerSurname,
+        phone: row.phone,
+        services: row.serviceNames,
+        staffId: row.staffId,
+        staffName: row.staffName,
+        notes: row.notes,
+        source: row.source,
+        status: row.status,
+      }))
+    }
+    return []
+  }, [apiRows])
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
   const [filterStatus, setFilterStatus] = useState<string>("all")
@@ -303,10 +214,8 @@ export function MyReservationsView({
     return days
   }, [currentMonth, currentYear, today])
 
-  // Kullanicinin rezervasyonlari
-  const myReservations = useMemo(() => {
-    return reservations.filter((r) => r.staffId === staffId)
-  }, [reservations, staffId])
+  // API zaten staffId (ve personel satir id aliaslari) ile filtreler
+  const myReservations = reservations
 
   // Filtrelenmis rezervasyonlar
   const filteredReservations = useMemo(() => {
@@ -359,10 +268,11 @@ export function MyReservationsView({
   })
 
   // Durum guncelle
-  const updateStatus = (id: string, newStatus: Reservation["status"]) => {
-    setReservations((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, status: newStatus } : r))
-    )
+  const updateStatus = async (id: string, newStatus: Reservation["status"]) => {
+    const result = await updateReservationStatus(id, newStatus)
+    if (!result.ok) {
+      alert(result.message ?? "Durum guncellenemedi.")
+    }
   }
 
   // Tarih formatla
@@ -383,6 +293,22 @@ export function MyReservationsView({
           </p>
         </div>
       </div>
+
+      {!businessUserId ? (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-900 dark:text-amber-200">
+          Isletme baglantisi bulunamadi. Sirkete davet kabul ettikten sonra cikis yapip tekrar giris yapin.
+        </div>
+      ) : null}
+
+      {error ? (
+        <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          {error}
+        </div>
+      ) : null}
+
+      {isLoading ? (
+        <p className="text-sm text-muted-foreground">Randevular yukleniyor...</p>
+      ) : null}
 
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
@@ -499,7 +425,7 @@ export function MyReservationsView({
 
         {/* Takvim Gunleri */}
         <div className="grid grid-cols-7 gap-1">
-          {calendarDays.map((day, index) => {
+          {calendarDays.map((day) => {
             const dayReservations = getReservationsForDate(day.dateStr)
             const hasReservations = dayReservations.length > 0
             const isSelected = selectedDate === day.dateStr
@@ -508,7 +434,7 @@ export function MyReservationsView({
 
             return (
               <button
-                key={index}
+                key={day.dateStr}
                 onClick={() => day.isCurrentMonth && setSelectedDate(isSelected ? null : day.dateStr)}
                 disabled={!day.isCurrentMonth}
                 className={cn(
@@ -536,9 +462,9 @@ export function MyReservationsView({
                 {hasReservations && day.isCurrentMonth && (
                   <div className="flex items-center gap-0.5 mt-1">
                     {dayReservations.length <= 3 ? (
-                      dayReservations.map((r, i) => (
+                      dayReservations.map((r) => (
                         <div
-                          key={i}
+                          key={reservationRowKey(r)}
                           className={cn(
                             "w-1.5 h-1.5 rounded-full",
                             isSelected
@@ -652,7 +578,7 @@ export function MyReservationsView({
 
             return (
               <div
-                key={reservation.id}
+                key={reservationRowKey(reservation)}
                 className="p-5 bg-card rounded-2xl border border-border hover:border-primary/30 transition-all"
               >
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -673,6 +599,12 @@ export function MyReservationsView({
                           <span className="inline-flex items-center gap-1 text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
                             <Globe className="w-3 h-3" />
                             Web
+                          </span>
+                        )}
+                        {reservation.source === "whatsapp" && (
+                          <span className="inline-flex items-center gap-1 text-xs text-green-700 bg-green-50 px-2 py-0.5 rounded-full">
+                            <MessageCircle className="w-3 h-3" />
+                            WhatsApp
                           </span>
                         )}
                       </div>
@@ -716,7 +648,7 @@ export function MyReservationsView({
                           size="sm"
                           variant="outline"
                           className="rounded-lg text-emerald-600 border-emerald-200 hover:bg-emerald-50"
-                          onClick={() => updateStatus(reservation.id, "confirmed")}
+                          onClick={() => void updateStatus(reservation.id, "confirmed")}
                         >
                           <CheckCircle2 className="w-4 h-4 mr-1" />
                           Onayla
@@ -725,7 +657,7 @@ export function MyReservationsView({
                           size="sm"
                           variant="outline"
                           className="rounded-lg text-red-600 border-red-200 hover:bg-red-50"
-                          onClick={() => updateStatus(reservation.id, "cancelled")}
+                          onClick={() => void updateStatus(reservation.id, "cancelled")}
                         >
                           <XCircle className="w-4 h-4 mr-1" />
                           Iptal
@@ -736,7 +668,7 @@ export function MyReservationsView({
                       <Button
                         size="sm"
                         className="rounded-lg"
-                        onClick={() => updateStatus(reservation.id, "completed")}
+                        onClick={() => void updateStatus(reservation.id, "completed")}
                       >
                         <CheckCircle2 className="w-4 h-4 mr-1" />
                         Tamamla

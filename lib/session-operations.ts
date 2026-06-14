@@ -21,6 +21,8 @@ export interface SessionOperationRow {
   customerName?: string
   customer_surname?: string
   customerSurname?: string
+  customer_phone?: string
+  customerPhone?: string
   services?: string
   staff_id?: string
   staffId?: string
@@ -28,6 +30,8 @@ export interface SessionOperationRow {
   staffName?: string
   notes?: string
   photo?: string | null
+  photo2?: string | null
+  photo3?: string | null
   share_on_instagram?: boolean | number | string
   shareOnInstagram?: boolean | number | string
   share_on_website?: boolean | number | string
@@ -53,6 +57,7 @@ export interface SessionOperation {
   workspaceName: string
   customerName: string
   customerSurname: string
+  customerPhone: string
   services: string[]
   serviceItems: SessionOperationServiceItem[]
   totalPrice: number
@@ -60,10 +65,13 @@ export interface SessionOperation {
   staffName: string
   notes: string
   photo: string | null
+  photo2: string | null
+  photo3: string | null
   shareOnInstagram: boolean
   shareOnWebsite: boolean
   startedAt: string | null
   endedAt: string | null
+  isActive: boolean
   createdAt: string | null
   updatedAt: string | null
 }
@@ -74,7 +82,16 @@ function toBoolean(value: unknown) {
 
 function toNullableString(value: unknown) {
   const normalized = String(value ?? "").trim()
-  return normalized || null
+  if (!normalized) {
+    return null
+  }
+
+  const sentinel = normalized.toUpperCase()
+  if (sentinel === "NULL" || sentinel === "CURRENT_TIMESTAMP") {
+    return null
+  }
+
+  return normalized
 }
 
 function toPrice(value: unknown) {
@@ -86,7 +103,7 @@ function normalizeText(value: unknown) {
   return String(value ?? "").trim().toLowerCase()
 }
 
-function toTimestampMs(value: unknown) {
+export function parseOperationTimestampMs(value: unknown) {
   const raw = String(value ?? "").trim()
   if (!raw) {
     return Number.NaN
@@ -98,13 +115,165 @@ function toTimestampMs(value: unknown) {
 }
 
 function timestampsMatch(left: unknown, right: unknown) {
-  const leftMs = toTimestampMs(left)
-  const rightMs = toTimestampMs(right)
+  const leftMs = parseOperationTimestampMs(left)
+  const rightMs = parseOperationTimestampMs(right)
   if (!Number.isFinite(leftMs) || !Number.isFinite(rightMs)) {
     return false
   }
 
   return Math.abs(leftMs - rightMs) <= 60_000
+}
+
+export function dedupeServiceItems(items: SessionOperationServiceItem[]) {
+  const map = new Map<string, SessionOperationServiceItem>()
+
+  items.forEach((item) => {
+    const name = String(item.name ?? "").trim()
+    const key = name.toLowerCase()
+    if (!key) {
+      return
+    }
+
+    const price = toPrice(item.price)
+    const existing = map.get(key)
+    if (!existing || price > existing.price) {
+      map.set(key, { name, price })
+    }
+  })
+
+  return Array.from(map.values())
+}
+
+export const SESSION_LINE_ITEMS_MARKER = "__lineItems:"
+export const SESSION_USER_NOTES_MARKER = "__userNotes:"
+
+export function encodeSessionNotesWithLineItems(
+  items: SessionOperationServiceItem[],
+  userNotes?: string | null,
+) {
+  const lineItems = items.map((item) => `${item.name}=${toPrice(item.price)}`).join("|")
+  const payload = `${SESSION_LINE_ITEMS_MARKER}${lineItems}`
+  const trimmedNotes = String(userNotes ?? "")
+    .trim()
+    .replace(/[\r\n]+/g, " ")
+  return trimmedNotes ? `${payload}${SESSION_USER_NOTES_MARKER}${trimmedNotes}` : payload
+}
+
+export function parseSessionLineItemsFromNotes(notesRaw: unknown) {
+  const notes = String(notesRaw ?? "")
+  const markerIndex = notes.indexOf(SESSION_LINE_ITEMS_MARKER)
+  if (markerIndex === -1) {
+    return []
+  }
+
+  const contentStart = markerIndex + SESSION_LINE_ITEMS_MARKER.length
+  const userNotesIndex = notes.indexOf(SESSION_USER_NOTES_MARKER, contentStart)
+  const lineItemsText = (
+    userNotesIndex === -1 ? notes.slice(contentStart) : notes.slice(contentStart, userNotesIndex)
+  ).trim()
+  if (!lineItemsText) {
+    return []
+  }
+
+  if (lineItemsText.startsWith("[")) {
+    return dedupeServiceItems(parseServiceItems(lineItemsText))
+  }
+
+  return dedupeServiceItems(
+    lineItemsText
+      .split("|")
+      .map((part) => {
+        const trimmed = part.trim()
+        if (!trimmed) {
+          return null
+        }
+
+        const eqIndex = trimmed.lastIndexOf("=")
+        if (eqIndex <= 0) {
+          return { name: trimmed, price: 0 }
+        }
+
+        return {
+          name: trimmed.slice(0, eqIndex).trim(),
+          price: toPrice(trimmed.slice(eqIndex + 1)),
+        }
+      })
+      .filter((item): item is SessionOperationServiceItem => item !== null && Boolean(item.name)),
+  )
+}
+
+export function stripSessionLineItemsFromNotes(notesRaw: unknown) {
+  const notes = String(notesRaw ?? "")
+  const markerIndex = notes.indexOf(SESSION_LINE_ITEMS_MARKER)
+  if (markerIndex === -1) {
+    return notes.trim()
+  }
+
+  const userNotesIndex = notes.indexOf(SESSION_USER_NOTES_MARKER, markerIndex)
+  if (userNotesIndex !== -1) {
+    return notes.slice(userNotesIndex + SESSION_USER_NOTES_MARKER.length).trim()
+  }
+
+  const afterMarker = notes.slice(markerIndex + SESSION_LINE_ITEMS_MARKER.length)
+  if (afterMarker.startsWith("[")) {
+    const jsonEnd = afterMarker.indexOf("\n")
+    return jsonEnd === -1 ? "" : afterMarker.slice(jsonEnd + 1).trim()
+  }
+
+  return ""
+}
+
+export function resolveSessionOperationRowId(row: SessionOperationRow | Record<string, unknown>) {
+  const candidates = [
+    (row as SessionOperationRow).id,
+    (row as SessionOperationRow & { ID?: unknown }).ID,
+    (row as { Id?: unknown }).Id,
+  ]
+
+  for (const candidate of candidates) {
+    const id = Number(candidate)
+    if (Number.isFinite(id) && id > 0) {
+      return id
+    }
+  }
+
+  return 0
+}
+
+export function isActiveSessionOperation(operation: {
+  startedAt: string | null
+  endedAt: string | null
+}) {
+  if (!operation.startedAt) {
+    return false
+  }
+
+  if (!operation.endedAt) {
+    return true
+  }
+
+  const startedMs = parseOperationTimestampMs(operation.startedAt)
+  const endedMs = parseOperationTimestampMs(operation.endedAt)
+  if (!Number.isFinite(startedMs) || !Number.isFinite(endedMs)) {
+    return false
+  }
+
+  return endedMs <= startedMs
+}
+
+export function resolveOperationServiceItems(servicesRaw: unknown, notesRaw?: unknown) {
+  const servicesText = String(servicesRaw ?? "")
+  const fromServices = dedupeServiceItems(parseServiceItems(servicesRaw))
+  if (servicesText.includes("@") || fromServices.some((item) => item.price > 0)) {
+    return fromServices
+  }
+
+  const fromNotes = parseSessionLineItemsFromNotes(notesRaw)
+  if (fromNotes.length > 0) {
+    return fromNotes
+  }
+
+  return fromServices
 }
 
 export function resolveSessionOperationId(
@@ -115,12 +284,12 @@ export function resolveSessionOperationId(
     workspaceName: string
     staffId: string
     startedAt?: string
-    endedAt: string
+    endedAt?: string | null
   }
 ) {
   const candidates = rows
     .map((row) => {
-      const id = Number(row.id)
+      const id = resolveSessionOperationRowId(row)
       if (!Number.isFinite(id) || id <= 0) {
         return null
       }
@@ -142,13 +311,28 @@ export function resolveSessionOperationId(
   const targetWorkspaceName = normalizeText(payload.workspaceName)
   const targetStaffId = normalizeText(payload.staffId)
 
-  const strictMatches = candidates.filter(
-    (row) =>
-      row.customerName === targetCustomerName &&
-      row.customerSurname === targetCustomerSurname &&
-      row.workspaceName === targetWorkspaceName &&
-      timestampsMatch(row.endedAt, payload.endedAt)
-  )
+  const strictMatches = candidates.filter((row) => {
+    if (
+      row.customerName !== targetCustomerName ||
+      row.customerSurname !== targetCustomerSurname ||
+      row.workspaceName !== targetWorkspaceName
+    ) {
+      return false
+    }
+
+    if (payload.endedAt == null) {
+      return (
+        row.staffId === targetStaffId &&
+        timestampsMatch(row.startedAt, payload.startedAt) &&
+        isActiveSessionOperation({
+          startedAt: toNullableString(row.startedAt),
+          endedAt: toNullableString(row.endedAt),
+        })
+      )
+    }
+
+    return timestampsMatch(row.endedAt, payload.endedAt)
+  })
   if (strictMatches.length > 0) {
     return Math.max(...strictMatches.map((row) => row.id))
   }
@@ -212,6 +396,28 @@ export function parseServiceItems(raw: unknown): SessionOperationServiceItem[] {
     }
   }
 
+  if (text.includes("@")) {
+    return text
+      .split("|")
+      .map((part) => {
+        const trimmed = part.trim()
+        if (!trimmed) {
+          return null
+        }
+
+        const atIndex = trimmed.lastIndexOf("@")
+        if (atIndex <= 0) {
+          return { name: trimmed, price: 0 }
+        }
+
+        return {
+          name: trimmed.slice(0, atIndex).trim(),
+          price: toPrice(trimmed.slice(atIndex + 1)),
+        }
+      })
+      .filter((item): item is SessionOperationServiceItem => item !== null && Boolean(item.name))
+  }
+
   return text
     .split("|")
     .map((item) => item.trim())
@@ -230,6 +436,10 @@ export function serializeServiceItems(items: SessionOperationServiceItem[]) {
 
 export function getSessionOperationTotalPrice(items: SessionOperationServiceItem[]) {
   return items.reduce((total, item) => total + toPrice(item.price), 0)
+}
+
+export function serializeServiceEntries(items: SessionOperationServiceItem[]) {
+  return items.map((item) => `${item.name}@${toPrice(item.price)}`).join("|")
 }
 
 export function serializeServiceNames(items: SessionOperationServiceItem[]) {
@@ -261,13 +471,10 @@ export function groupSessionOperationItemsByOperationId(rows: SessionOperationIt
   return grouped
 }
 
-export function normalizeSessionOperationRows(
-  rows: SessionOperationRow[],
-  itemsByOperationId?: Map<number, SessionOperationServiceItem[]>
-): SessionOperation[] {
+export function normalizeSessionOperationRows(rows: SessionOperationRow[]): SessionOperation[] {
   return rows
     .map((row) => {
-      const id = Number(row.id)
+      const id = resolveSessionOperationRowId(row)
       if (!Number.isFinite(id) || id <= 0) {
         return null
       }
@@ -275,7 +482,10 @@ export function normalizeSessionOperationRows(
       const workspaceIdRaw = row.workspace_id ?? row.workspaceId
       const workspaceIdNum = Number(workspaceIdRaw)
       const workspaceId = Number.isFinite(workspaceIdNum) && workspaceIdNum > 0 ? workspaceIdNum : null
-      const serviceItems = itemsByOperationId?.get(id) ?? parseServiceItems(row.services)
+      const startedAt = toNullableString(row.started_at ?? row.startedAt)
+      const endedAt = toNullableString(row.ended_at ?? row.endedAt)
+      const serviceItems = resolveOperationServiceItems(row.services, row.notes)
+      const isActive = isActiveSessionOperation({ startedAt, endedAt })
 
       return {
         id,
@@ -283,17 +493,21 @@ export function normalizeSessionOperationRows(
         workspaceName: String(row.workspace_name ?? row.workspaceName ?? "").trim(),
         customerName: String(row.customer_name ?? row.customerName ?? "").trim(),
         customerSurname: String(row.customer_surname ?? row.customerSurname ?? "").trim(),
+        customerPhone: String(row.customer_phone ?? row.customerPhone ?? "").trim(),
         services: serviceItems.map((item) => item.name),
         serviceItems,
         totalPrice: getSessionOperationTotalPrice(serviceItems),
         staffId: String(row.staff_id ?? row.staffId ?? "").trim(),
         staffName: String(row.staff_name ?? row.staffName ?? "").trim(),
-        notes: String(row.notes ?? "").trim(),
+        notes: stripSessionLineItemsFromNotes(row.notes),
         photo: toNullableString(row.photo),
+        photo2: toNullableString(row.photo2),
+        photo3: toNullableString(row.photo3),
         shareOnInstagram: toBoolean(row.share_on_instagram ?? row.shareOnInstagram),
         shareOnWebsite: toBoolean(row.share_on_website ?? row.shareOnWebsite),
-        startedAt: toNullableString(row.started_at ?? row.startedAt),
-        endedAt: toNullableString(row.ended_at ?? row.endedAt),
+        startedAt,
+        endedAt,
+        isActive,
         createdAt: toNullableString(row.createdAt ?? row.created_at),
         updatedAt: toNullableString(row.updatedAt ?? row.updated_at),
       }

@@ -52,86 +52,7 @@ const summaryCards = [
   { label: "Kategori", value: 4, icon: Boxes, color: "text-blue-500" },
 ]
 
-// Kuafor salonu stok urunleri
-const initialInventory = [
-  {
-    id: "PRD001",
-    name: "Loreal Professionnel Sampuan",
-    description: "Yipranmis saclar icin onarici sampuan 500ml",
-    category: "Sac Bakim",
-    price: "450.00",
-    cost: "280.00",
-    stock: 25,
-    minStock: 10,
-    status: "mevcut",
-  },
-  {
-    id: "PRD002",
-    name: "Wella Koleston Boya",
-    description: "Kalici sac boyasi - tum tonlar",
-    category: "Sac Boyasi",
-    price: "320.00",
-    cost: "180.00",
-    stock: 0,
-    minStock: 15,
-    status: "stokta yok",
-  },
-  {
-    id: "PRD003",
-    name: "Moroccan Oil Bakim Yagi",
-    description: "Argan yagli sac bakim serumu 100ml",
-    category: "Sac Bakim",
-    price: "680.00",
-    cost: "420.00",
-    stock: 12,
-    minStock: 5,
-    status: "mevcut",
-  },
-  {
-    id: "PRD004",
-    name: "Schwarzkopf Sac Spreyi",
-    description: "Guclu tutucu sac spreyi 300ml",
-    category: "Styling",
-    price: "280.00",
-    cost: "150.00",
-    stock: 8,
-    minStock: 10,
-    status: "dusuk stok",
-  },
-  {
-    id: "PRD005",
-    name: "Kerastase Sac Maskesi",
-    description: "Yogun nemlendirici maske 200ml",
-    category: "Sac Bakim",
-    price: "890.00",
-    cost: "550.00",
-    stock: 18,
-    minStock: 8,
-    status: "mevcut",
-  },
-  {
-    id: "PRD006",
-    name: "MAC Fondoten",
-    description: "Studio Fix Fluid SPF15 30ml",
-    category: "Cilt & Makyaj",
-    price: "1250.00",
-    cost: "780.00",
-    stock: 5,
-    minStock: 8,
-    status: "dusuk stok",
-  },
-  {
-    id: "PRD007",
-    name: "Redken Sac Jeli",
-    description: "Islak etkili sac sekillendirici 150ml",
-    category: "Styling",
-    price: "380.00",
-    cost: "220.00",
-    stock: 30,
-    minStock: 10,
-    status: "mevcut",
-  },
-]
+
 
 const statusColors: Record<string, string> = {
   "mevcut": "bg-emerald-100 text-emerald-700 border-emerald-200",
@@ -146,7 +67,7 @@ interface InventoryViewProps {
 }
 
 export function InventoryView({ businessUserId }: InventoryViewProps) {
-  const [inventory, setInventory] = useState(initialInventory)
+  const [inventory, setInventory] = useState<any[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [showAddModal, setShowAddModal] = useState(false)
   const [editingProductId, setEditingProductId] = useState<string | null>(null)
@@ -381,21 +302,17 @@ export function InventoryView({ businessUserId }: InventoryViewProps) {
 
   return (
     <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">Stok Yonetimi</h1>
+          <h1 className="text-2xl font-semibold text-foreground">Stok Yönetimi</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Urunleri ekleyin, duzenleyin ve stok takibi yapin
+            Ürünleri ekleyin, düzenleyin ve stok takibi yapın
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" className="rounded-xl gap-2">
-            <Download className="w-4 h-4" />
-            Disa Aktar
-          </Button>
-          <Button className="rounded-xl gap-2" onClick={() => setShowAddModal(true)}>
+        <div className="flex gap-2 w-full sm:w-auto">
+          <Button className="rounded-xl gap-2 w-full sm:w-auto" onClick={() => setShowAddModal(true)}>
             <Plus className="w-4 h-4" />
-            Urun Ekle
+            Ürün Ekle
           </Button>
         </div>
       </div>
@@ -566,7 +483,7 @@ export function InventoryView({ businessUserId }: InventoryViewProps) {
                     <Edit3 className="w-5 h-5 text-amber-600" />
                   </div>
                   <div>
-                    <h2 className="text-xl font-semibold text-foreground">Urun Duzenle</h2>
+                    <h2 className="text-xl font-semibold text-foreground">Ürün Düzenle</h2>
                     <p className="text-sm text-muted-foreground">{editingProductName}</p>
                   </div>
                 </div>
@@ -587,8 +504,8 @@ export function InventoryView({ businessUserId }: InventoryViewProps) {
                   <Sparkles className="w-8 h-8 text-purple-400" />
                 </div>
                 <div>
-                  <p className="font-medium text-foreground">Urun Gorseli</p>
-                  <p className="text-sm text-muted-foreground">Gorseli degistirmek icin tiklayin</p>
+                  <p className="font-medium text-foreground">Ürün Görseli</p>
+                  <p className="text-sm text-muted-foreground">Görseli değiştirmek için tıklayın</p>
                 </div>
               </div>
 
@@ -596,10 +513,10 @@ export function InventoryView({ businessUserId }: InventoryViewProps) {
                 <div className="space-y-2">
                   <label className="flex items-center gap-2 text-sm font-medium text-foreground">
                     <Tag className="w-4 h-4 text-muted-foreground" />
-                    Urun Adi *
+                    Ürün Adı *
                   </label>
                   <Input
-                    placeholder="Urun adi"
+                    placeholder="Ürün adı"
                     value={editProduct.name}
                     onChange={(e) => setEditProduct((p) => ({ ...p, name: e.target.value }))}
                     className="rounded-xl h-11"
@@ -772,7 +689,7 @@ export function InventoryView({ businessUserId }: InventoryViewProps) {
               <TableHead className="w-10">
                 <Checkbox />
               </TableHead>
-              <TableHead className="text-xs font-medium text-muted-foreground uppercase">Urun</TableHead>
+              <TableHead className="text-xs font-medium text-muted-foreground uppercase">Ürün</TableHead>
               <TableHead className="text-xs font-medium text-muted-foreground uppercase">Kategori</TableHead>
               <TableHead className="text-xs font-medium text-muted-foreground uppercase">Fiyat</TableHead>
               <TableHead className="text-xs font-medium text-muted-foreground uppercase">Maliyet</TableHead>
@@ -857,14 +774,14 @@ export function InventoryView({ businessUserId }: InventoryViewProps) {
             onClick={() => openEditModal(openMenuId)}
           >
             <Edit3 className="w-3.5 h-3.5" />
-            Duzenle
+            Düzenle
           </button>
           <button
             className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg text-red-600 hover:bg-red-50 transition-colors"
             onClick={() => handleRemoveProduct(openMenuId)}
           >
             <Trash2 className="w-3.5 h-3.5" />
-            Kaldir
+            Kaldır
           </button>
         </div>
       )}

@@ -3,13 +3,25 @@
 import { apiFetch } from "@/lib/api-fetch"
 import { useEffect, useState } from "react"
 import { useGooglePlaceSettings } from "@/hooks/use-google-place-settings"
+import { useInstagramSettings } from "@/hooks/use-instagram-settings"
+import { normalizeAccessToken } from "@/lib/instagram-token"
 import { useSalonServices } from "@/hooks/use-salon-services"
-import { 
-  User, 
-  Lock, 
-  Key, 
-  Bell, 
-  Palette, 
+import { useServiceStages } from "@/hooks/use-service-stages"
+import { ServiceStagesEditor } from "@/components/dashboard/service-stages-editor"
+import { SalonServiceSettingsCatalog } from "@/components/dashboard/salon-service-operation-cards"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import type { SalonServiceStage } from "@/lib/salon-service-stages"
+import {
+  User,
+  Lock,
+  Key,
+  Bell,
+  Palette,
   Globe,
   Camera,
   Eye,
@@ -26,12 +38,15 @@ import {
   MapPin,
   Scissors,
   CreditCard,
+  Instagram,
+  MessageCircle,
 } from "lucide-react"
 import { CorporateBillingTab } from "@/components/dashboard/corporate-billing-tab"
 import { cn } from "@/lib/utils"
 
 interface SettingsViewProps {
   user?: {
+    id?: string
     email: string
     shopName: string
     role: string
@@ -40,21 +55,32 @@ interface SettingsViewProps {
   }
 }
 
-type SettingsTab = "profile" | "security" | "google" | "notifications" | "appearance" | "business" | "billing"
+type SettingsTab = "profile" | "security" | "google" | "instagram" | "whatsapp" | "notifications" | "appearance" | "business" | "billing"
 
 export function SettingsView({ user }: SettingsViewProps) {
-  const { services } = useSalonServices(user?.businessUserId)
+  const { services, reload: reloadServices } = useSalonServices(user?.businessUserId)
+  const { getStagesForService, saveStagesForService } = useServiceStages(user?.businessUserId, services)
+  const [stagesEditorServiceId, setStagesEditorServiceId] = useState<string | null>(null)
+  const [draftStages, setDraftStages] = useState<SalonServiceStage[]>([])
+  const [isSavingStages, setIsSavingStages] = useState(false)
+  const [stagesSaveError, setStagesSaveError] = useState<string | null>(null)
   const { settings: googleSettings, isSaving: isGoogleSaving, saveSettings: saveGoogleSettings } = useGooglePlaceSettings(user?.businessUserId)
+  const {
+    settings: instagramSettings,
+    isSaving: isInstagramSaving,
+    saveSettings: saveInstagramSettings,
+    disconnectSettings: disconnectInstagramSettings,
+  } = useInstagramSettings(user?.businessUserId)
   const [activeTab, setActiveTab] = useState<SettingsTab>("profile")
-  
+
   // Profile state
   const [profileData, setProfileData] = useState({
-    firstName: "Ismail",
-    lastName: "Altin",
-    email: user?.email || "ismail@example.com",
-    phone: "+90 555 123 4567",
-    companyName: user?.shopName || "Kuaför",
-    address: "Istanbul, Turkiye",
+    firstName: "",
+    lastName: "",
+    email: user?.email || "",
+    phone: "",
+    companyName: user?.shopName || "",
+    address: "",
     profileImage: null as string | null
   })
   const [profileSaved, setProfileSaved] = useState(false)
@@ -81,6 +107,34 @@ export function SettingsView({ user }: SettingsViewProps) {
   const [googleSaved, setGoogleSaved] = useState(false)
   const [googleError, setGoogleError] = useState("")
 
+  // Instagram API state
+  const [instagramData, setInstagramData] = useState({
+    instagramUserId: "",
+    instagramUsername: "",
+    facebookPageId: "",
+    accessToken: "",
+    tokenExpiresAt: "",
+    scopes: "",
+    isActive: true,
+  })
+  const [instagramConnected, setInstagramConnected] = useState(false)
+  const [instagramSaved, setInstagramSaved] = useState(false)
+  const [instagramError, setInstagramError] = useState("")
+  const [showInstagramToken, setShowInstagramToken] = useState(false)
+
+  // WhatsApp Business API state
+  const [whatsappData, setWhatsappData] = useState({
+    phoneNumber: "",
+    phoneNumberId: "",
+    whatsappBusinessAccountId: "",
+    accessToken: "",
+    isActive: true,
+  })
+  const [whatsappConnected, setWhatsappConnected] = useState(false)
+  const [whatsappSaved, setWhatsappSaved] = useState(false)
+  const [whatsappError, setWhatsappError] = useState("")
+  const [showWhatsappToken, setShowWhatsappToken] = useState(false)
+
   // Notifications state
   const [notifications, setNotifications] = useState({
     emailNotifications: true,
@@ -101,6 +155,8 @@ export function SettingsView({ user }: SettingsViewProps) {
   const allServices = services.map((service) => ({
     id: String(service.id),
     label: service.name,
+    category: service.category,
+    durationMinutes: service.durationMinutes,
   }))
   // "idle" = not selected | "editing" = selected, price input open | "saved" = price confirmed (green)
   const [serviceStates, setServiceStates] = useState<Record<string, "idle" | "editing" | "saved">>({})
@@ -117,6 +173,75 @@ export function SettingsView({ user }: SettingsViewProps) {
     })
     setGoogleConnected(true)
   }, [googleSettings])
+
+  useEffect(() => {
+    if (!instagramSettings) {
+      return
+    }
+
+    setInstagramData({
+      instagramUserId: instagramSettings.instagramUserId,
+      instagramUsername: instagramSettings.instagramUsername,
+      facebookPageId: instagramSettings.facebookPageId,
+      accessToken: instagramSettings.accessToken,
+      tokenExpiresAt: instagramSettings.tokenExpiresAt
+        ? instagramSettings.tokenExpiresAt.slice(0, 16)
+        : "",
+      scopes: instagramSettings.scopes,
+      isActive: instagramSettings.isActive,
+    })
+    setInstagramConnected(instagramSettings.isConnected)
+  }, [instagramSettings])
+
+  useEffect(() => {
+    const userId = user?.id?.trim()
+    if (!userId) {
+      return
+    }
+
+    let cancelled = false
+
+    void (async () => {
+      try {
+        const res = await apiFetch(
+          `/api/user-profile?userId=${encodeURIComponent(userId)}`,
+          { cache: "no-store" },
+        )
+        const json = (await res.json().catch(() => null)) as {
+          ok?: boolean
+          profile?: {
+            firstName?: string
+            lastName?: string
+            phone?: string
+            email?: string
+            companyName?: string
+          }
+        } | null
+        if (cancelled || !res.ok || !json?.ok || !json.profile) {
+          return
+        }
+
+        const profile = json.profile
+        setProfileData((prev) => ({
+          ...prev,
+          firstName: String(profile.firstName ?? "").trim() || prev.firstName,
+          lastName: String(profile.lastName ?? "").trim() || prev.lastName,
+          phone: String(profile.phone ?? "").trim() || prev.phone,
+          email: String(profile.email ?? "").trim() || user?.email || prev.email,
+          companyName:
+            String(profile.companyName ?? "").trim() ||
+            user?.shopName?.trim() ||
+            prev.companyName,
+        }))
+      } catch {
+        // ignore
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [user?.id, user?.email, user?.shopName])
 
   useEffect(() => {
     if (!services.length) {
@@ -224,12 +349,18 @@ export function SettingsView({ user }: SettingsViewProps) {
     ...(!isBireysel
       ? [{ id: "google" as SettingsTab, label: "Google Ayarlari", icon: Key, description: "Google API baglantinizi yonetin" }]
       : []),
+    ...(!isBireysel
+      ? [{ id: "instagram" as SettingsTab, label: "Instagram Ayarlari", icon: Instagram, description: "Instagram API baglantinizi yonetin" }]
+      : []),
+    ...(!isBireysel
+      ? [{ id: "whatsapp" as SettingsTab, label: "WhatsApp Ayarlari", icon: MessageCircle, description: "WhatsApp Business API baglantinizi yonetin" }]
+      : []),
     { id: "notifications" as SettingsTab, label: "Bildirimler", icon: Bell, description: "Bildirim tercihlerinizi ayarlayin" },
     { id: "appearance" as SettingsTab, label: "Gorunum", icon: Palette, description: "Tema ve dil ayarlari" },
   ]
 
   useEffect(() => {
-    if (isBireysel && (activeTab === "business" || activeTab === "google" || activeTab === "billing")) {
+    if (isBireysel && (activeTab === "business" || activeTab === "google" || activeTab === "instagram" || activeTab === "whatsapp" || activeTab === "billing")) {
       setActiveTab("profile")
     }
   }, [isBireysel, activeTab])
@@ -242,7 +373,7 @@ export function SettingsView({ user }: SettingsViewProps) {
   const handlePasswordChange = () => {
     setPasswordError("")
     setPasswordSuccess(false)
-    
+
     if (securityData.currentPassword.length < 1) {
       setPasswordError("Mevcut sifrenizi girin")
       return
@@ -255,7 +386,7 @@ export function SettingsView({ user }: SettingsViewProps) {
       setPasswordError("Sifreler eslesmiyor")
       return
     }
-    
+
     setPasswordSuccess(true)
     setSecurityData({ currentPassword: "", newPassword: "", confirmPassword: "" })
     setTimeout(() => setPasswordSuccess(false), 3000)
@@ -284,6 +415,75 @@ export function SettingsView({ user }: SettingsViewProps) {
     setGoogleError("")
   }
 
+  const handleInstagramSave = async () => {
+    const accessToken =
+      normalizeAccessToken(instagramData.accessToken) ||
+      normalizeAccessToken(instagramSettings?.accessToken)
+
+    if (!instagramData.instagramUserId || !accessToken) {
+      setInstagramError("Instagram User ID ve Access Token zorunlu.")
+      return
+    }
+
+    const result = await saveInstagramSettings({
+      instagramUserId: instagramData.instagramUserId,
+      instagramUsername: instagramData.instagramUsername,
+      facebookPageId: instagramData.facebookPageId || undefined,
+      accessToken,
+      tokenExpiresAt: instagramData.tokenExpiresAt || undefined,
+      scopes: instagramData.scopes || undefined,
+      isActive: instagramData.isActive,
+    })
+    if (!result.ok) {
+      setInstagramError(result.message)
+      return
+    }
+
+    setInstagramError("")
+    setInstagramConnected(true)
+    setInstagramSaved(true)
+    setTimeout(() => setInstagramSaved(false), 3000)
+  }
+
+  const handleInstagramDisconnect = async () => {
+    const result = await disconnectInstagramSettings()
+    if (!result.ok) {
+      setInstagramError(result.message)
+      return
+    }
+
+    setInstagramConnected(false)
+    setInstagramData({
+      instagramUserId: "",
+      instagramUsername: "",
+      facebookPageId: "",
+      accessToken: "",
+      tokenExpiresAt: "",
+      scopes: "",
+      isActive: true,
+    })
+    setInstagramError("")
+  }
+
+  const handleWhatsappSave = () => {
+    setWhatsappError("")
+    setWhatsappConnected(true)
+    setWhatsappSaved(true)
+    setTimeout(() => setWhatsappSaved(false), 3000)
+  }
+
+  const handleWhatsappDisconnect = () => {
+    setWhatsappConnected(false)
+    setWhatsappData({
+      phoneNumber: "",
+      phoneNumberId: "",
+      whatsappBusinessAccountId: "",
+      accessToken: "",
+      isActive: true,
+    })
+    setWhatsappError("")
+  }
+
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
@@ -300,7 +500,7 @@ export function SettingsView({ user }: SettingsViewProps) {
       <div>
         <h3 className="text-base font-semibold text-foreground mb-1">Isletme Ayarlari</h3>
         <p className="text-xs text-muted-foreground">
-          Hizmete tıklayın, fiyatı girin ve kaydedin. Kaydettiğinizde kart yeşile döner.
+          Hizmete tiklayin, fiyati girin ve kaydedin. Kaydettikten sonra asamalari tanimlayarak randevu planlamasini yapin.
         </p>
       </div>
 
@@ -308,97 +508,81 @@ export function SettingsView({ user }: SettingsViewProps) {
         <h4 className="text-xs font-semibold text-foreground mb-3">
           Yapilacak Islemler
           <span className="ml-2 font-normal text-muted-foreground">
-            ({selectedServices.length}/{allServices.length} secildi)
+            ({selectedServices.length}/{allServices.length} secildi · {services.length} hizmet listelendi)
           </span>
         </h4>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-          {allServices.map((service) => {
-            const state = serviceStates[service.id] ?? "idle"
-            const price = servicePrices[service.id] || ""
-
-            return (
-              <div
-                key={service.id}
-                className={cn(
-                  "rounded-lg border overflow-hidden transition-all",
-                  state === "idle" && "border-border bg-background",
-                  state === "editing" && "border-primary bg-primary/5",
-                  state === "saved" && "border-green-500 bg-green-50 dark:bg-green-950/20",
-                )}
-              >
-                {/* Card Header — always clickable */}
-                <button
-                  type="button"
-                  onClick={() => handleServiceCardClick(service.id)}
-                  className="w-full flex items-center gap-2 px-3 py-2.5 text-left"
-                >
-                  <div className={cn(
-                    "w-6 h-6 rounded flex items-center justify-center flex-shrink-0 transition-colors",
-                    state === "idle" && "bg-muted text-muted-foreground",
-                    state === "editing" && "bg-primary text-primary-foreground",
-                    state === "saved" && "bg-green-500 text-white",
-                  )}>
-                    {state === "saved" ? (
-                      <Check className="w-3 h-3" />
-                    ) : (
-                      <Scissors className="w-3 h-3" />
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className={cn(
-                      "text-xs font-medium truncate transition-colors",
-                      state === "idle" && "text-muted-foreground",
-                      state === "editing" && "text-foreground",
-                      state === "saved" && "text-green-700 dark:text-green-400",
-                    )}>
-                      {service.label}
-                    </p>
-                    {state === "saved" && price && (
-                      <p className="text-[10px] text-green-600 dark:text-green-500 font-medium">{price} ₺</p>
-                    )}
-                  </div>
-                </button>
-
-                {/* Inline price input — only when editing */}
-                {state === "editing" && (
-                  <div className="px-3 pb-2.5 space-y-2">
-                    <div className="flex items-center gap-1">
-                      <input
-                        type="number"
-                        min="0"
-                        step="1"
-                        autoFocus
-                        value={price}
-                        onChange={(e) => updateServicePrice(service.id, e.target.value)}
-                        placeholder="0"
-                        className="w-full px-2 py-1 text-xs rounded border border-border bg-background text-foreground text-right font-medium focus:outline-none focus:ring-1 focus:ring-primary"
-                      />
-                      <span className="text-xs text-muted-foreground flex-shrink-0">₺</span>
-                    </div>
-                    <div className="flex gap-1">
-                      <button
-                        type="button"
-                        onClick={() => handleServiceSave(service.id)}
-                        className="flex-1 flex items-center justify-center gap-1 py-1 bg-primary text-primary-foreground rounded text-[10px] font-medium hover:bg-primary/90 transition-colors"
-                      >
-                        <Check className="w-2.5 h-2.5" />
-                        Kaydet
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleServiceRemove(service.id)}
-                        className="flex-1 py-1 border border-border rounded text-[10px] font-medium text-muted-foreground hover:bg-muted transition-colors"
-                      >
-                        Kaldir
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )
-          })}
-        </div>
+        <SalonServiceSettingsCatalog
+          services={allServices}
+          serviceStates={serviceStates}
+          servicePrices={servicePrices}
+          onCardClick={handleServiceCardClick}
+          onPriceChange={updateServicePrice}
+          onSave={handleServiceSave}
+          onRemove={handleServiceRemove}
+          onEditStages={(serviceId) => {
+            const svc = services.find((item) => String(item.id) === serviceId)
+            if (!svc) return
+            setStagesEditorServiceId(serviceId)
+            setDraftStages(getStagesForService(svc))
+          }}
+        />
       </div>
+
+      <Dialog
+        open={!!stagesEditorServiceId}
+        onOpenChange={(open) => {
+          if (!open) {
+            setStagesEditorServiceId(null)
+          }
+        }}
+      >
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              Hizmet asamalari
+              {stagesEditorServiceId
+                ? ` · ${services.find((s) => String(s.id) === stagesEditorServiceId)?.name ?? ""}`
+                : ""}
+            </DialogTitle>
+          </DialogHeader>
+          {stagesEditorServiceId ? (
+            <ServiceStagesEditor
+              serviceName={services.find((s) => String(s.id) === stagesEditorServiceId)?.name ?? ""}
+              durationMinutes={
+                services.find((s) => String(s.id) === stagesEditorServiceId)?.durationMinutes ?? 30
+              }
+              stages={draftStages}
+              onChange={setDraftStages}
+            />
+          ) : null}
+          {stagesSaveError ? (
+            <p className="text-xs text-destructive">{stagesSaveError}</p>
+          ) : null}
+          <button
+            type="button"
+            disabled={isSavingStages}
+            onClick={() => {
+              void (async () => {
+                if (!stagesEditorServiceId) return
+                const svc = services.find((item) => String(item.id) === stagesEditorServiceId)
+                setIsSavingStages(true)
+                setStagesSaveError(null)
+                const result = await saveStagesForService(Number(stagesEditorServiceId), draftStages, svc)
+                setIsSavingStages(false)
+                if (!result.ok) {
+                  setStagesSaveError(result.message)
+                  return
+                }
+                setStagesEditorServiceId(null)
+                reloadServices()
+              })()
+            }}
+            className="w-full py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+          >
+            {isSavingStages ? "Kaydediliyor..." : "Asamalari kaydet (veritabani)"}
+          </button>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 
@@ -705,8 +889,8 @@ export function SettingsView({ user }: SettingsViewProps) {
       {/* Connection Status */}
       <div className={cn(
         "p-4 rounded-lg border",
-        googleConnected 
-          ? "bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800" 
+        googleConnected
+          ? "bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800"
           : "bg-amber-50 border-amber-200 dark:bg-amber-900/20 dark:border-amber-800"
       )}>
         <div className="flex items-center gap-3">
@@ -731,8 +915,8 @@ export function SettingsView({ user }: SettingsViewProps) {
               "text-sm",
               googleConnected ? "text-green-600 dark:text-green-500" : "text-amber-600 dark:text-amber-500"
             )}>
-              {googleConnected 
-                ? "Yorumlariniz otomatik olarak cekiliyor" 
+              {googleConnected
+                ? "Yorumlariniz otomatik olarak cekiliyor"
                 : "Yorumlari almak icin API bilgilerinizi girin"}
             </p>
           </div>
@@ -829,6 +1013,433 @@ export function SettingsView({ user }: SettingsViewProps) {
     </div>
   )
 
+  const renderInstagramTab = () => (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-lg font-semibold text-foreground mb-1">Instagram API Ayarlari</h3>
+        <p className="text-sm text-muted-foreground">Instagram isletme hesabinizi baglayin ve paylasimlari yonetin</p>
+      </div>
+
+      <div className={cn(
+        "p-4 rounded-lg border",
+        instagramConnected
+          ? "bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800"
+          : "bg-amber-50 border-amber-200 dark:bg-amber-900/20 dark:border-amber-800"
+      )}>
+        <div className="flex items-center gap-3">
+          <div className={cn(
+            "w-10 h-10 rounded-full flex items-center justify-center",
+            instagramConnected ? "bg-green-100 dark:bg-green-800" : "bg-amber-100 dark:bg-amber-800"
+          )}>
+            {instagramConnected ? (
+              <Check className="w-5 h-5 text-green-600 dark:text-green-400" />
+            ) : (
+              <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+            )}
+          </div>
+          <div>
+            <p className={cn(
+              "font-medium",
+              instagramConnected ? "text-green-700 dark:text-green-400" : "text-amber-700 dark:text-amber-400"
+            )}>
+              {instagramConnected ? "Instagram Bagli" : "Instagram Bagli Degil"}
+            </p>
+            <p className={cn(
+              "text-sm",
+              instagramConnected ? "text-green-600 dark:text-green-500" : "text-amber-600 dark:text-amber-500"
+            )}>
+              {instagramConnected
+                ? instagramData.instagramUsername
+                  ? `@${instagramData.instagramUsername.replace(/^@/, "")} hesabi bagli`
+                  : "Instagram hesabiniz bagli"
+                : "Paylasim yapmak icin API bilgilerinizi girin"}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {instagramError && (
+        <div className="flex items-center gap-2 p-4 bg-destructive/10 border border-destructive/20 rounded-lg max-w-lg">
+          <AlertCircle className="w-5 h-5 text-destructive" />
+          <p className="text-sm text-destructive">{instagramError}</p>
+        </div>
+      )}
+
+      <div className="space-y-4 max-w-lg">
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-1.5">Instagram User ID</label>
+          <div className="relative">
+            <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <input
+              type="text"
+              value={instagramData.instagramUserId}
+              onChange={(e) => setInstagramData(prev => ({ ...prev, instagramUserId: e.target.value }))}
+              className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-mono text-sm"
+              placeholder="178414..."
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-1.5">Instagram Kullanici Adi</label>
+          <div className="relative">
+            <Instagram className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <input
+              type="text"
+              value={instagramData.instagramUsername}
+              onChange={(e) => setInstagramData(prev => ({ ...prev, instagramUsername: e.target.value }))}
+              className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm"
+              placeholder="salonadi"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-1.5">Facebook Page ID (opsiyonel)</label>
+          <div className="relative">
+            <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <input
+              type="text"
+              value={instagramData.facebookPageId}
+              onChange={(e) => setInstagramData(prev => ({ ...prev, facebookPageId: e.target.value }))}
+              className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-mono text-sm"
+              placeholder="1234567890"
+            />
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">Token alirken veya IG User ID bulurken gerekebilir; paylasim icin zorunlu degil</p>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-1.5">Access Token</label>
+          <div className="relative">
+            <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <input
+              type={showInstagramToken ? "text" : "password"}
+              value={instagramData.accessToken}
+              onChange={(e) => setInstagramData(prev => ({ ...prev, accessToken: e.target.value }))}
+              onBlur={(e) =>
+                setInstagramData((prev) => ({
+                  ...prev,
+                  accessToken: normalizeAccessToken(e.target.value),
+                }))
+              }
+              onPaste={(e) => {
+                const pasted = e.clipboardData.getData("text")
+                if (!pasted.trim()) {
+                  return
+                }
+                e.preventDefault()
+                setInstagramData((prev) => ({
+                  ...prev,
+                  accessToken: normalizeAccessToken(pasted),
+                }))
+              }}
+              className="w-full pl-10 pr-10 py-2.5 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-mono text-sm"
+              placeholder="EAA..."
+            />
+            <button
+              type="button"
+              onClick={() => setShowInstagramToken(prev => !prev)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
+              {showInstagramToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">
+            Meta Graph Explorer&apos;dan alinan User veya Page token (EAA... ile baslar). &quot;OAuth&quot; on eki olmadan yapistirin.
+          </p>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-1.5">Token Bitis Tarihi</label>
+          <input
+            type="datetime-local"
+            value={instagramData.tokenExpiresAt}
+            onChange={(e) => setInstagramData(prev => ({ ...prev, tokenExpiresAt: e.target.value }))}
+            className="w-full px-4 py-2.5 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-1.5">Scopes</label>
+          <input
+            type="text"
+            value={instagramData.scopes}
+            onChange={(e) => setInstagramData(prev => ({ ...prev, scopes: e.target.value }))}
+            className="w-full px-4 py-2.5 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm"
+            placeholder="instagram_basic,instagram_content_publish"
+          />
+        </div>
+
+        <div className="flex items-center justify-between p-4 bg-muted/30 rounded-lg">
+          <div>
+            <p className="text-sm font-medium text-foreground">Aktif</p>
+            <p className="text-xs text-muted-foreground">Instagram paylasimlari icin baglantiyi kullan</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setInstagramData(prev => ({ ...prev, isActive: !prev.isActive }))}
+            className={cn(
+              "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+              instagramData.isActive ? "bg-primary" : "bg-muted"
+            )}
+          >
+            <span
+              className={cn(
+                "inline-block h-4 w-4 transform rounded-full bg-white transition-transform",
+                instagramData.isActive ? "translate-x-6" : "translate-x-1"
+              )}
+            />
+          </button>
+        </div>
+
+        <div className="flex items-center gap-3 pt-2">
+          <button
+            onClick={() => void handleInstagramSave()}
+            disabled={
+              !instagramData.instagramUserId ||
+              (!instagramData.accessToken && !instagramSettings?.accessToken) ||
+              isInstagramSaving
+            }
+            className="flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Save className="w-4 h-4" />
+            {instagramConnected ? "Guncelle" : "Baglan"}
+          </button>
+          {instagramConnected && (
+            <button
+              onClick={() => void handleInstagramDisconnect()}
+              disabled={isInstagramSaving}
+              className="px-5 py-2.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors font-medium disabled:opacity-50"
+            >
+              Baglantiyi Kes
+            </button>
+          )}
+          {instagramSaved && (
+            <span className="flex items-center gap-1.5 text-sm text-green-600">
+              <Check className="w-4 h-4" />
+              Kaydedildi
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="pt-6 border-t border-border">
+        <h4 className="text-sm font-semibold text-foreground mb-3">Instagram API Bilgileri Nasil Alinir?</h4>
+        <div className="space-y-2">
+          {[
+            "Meta for Developers'a gidin (developers.facebook.com)",
+            "Uygulama olusturun ve Instagram Graph API urununu ekleyin",
+            "Facebook sayfanizi Instagram isletme hesabina baglayin",
+            "Gerekli izinleri (scopes) talep edin ve access token alin",
+            "Instagram User ID ve Facebook Page ID bilgilerini kaydedin",
+          ].map((step, index) => (
+            <div key={index} className="flex items-start gap-3">
+              <span className="flex-shrink-0 w-5 h-5 rounded-full bg-primary/10 text-primary text-xs font-medium flex items-center justify-center">
+                {index + 1}
+              </span>
+              <p className="text-sm text-muted-foreground">{step}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+
+  const renderWhatsappTab = () => (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-lg font-semibold text-foreground mb-1">WhatsApp Business API Ayarlari</h3>
+        <p className="text-sm text-muted-foreground">WhatsApp Business hesabinizi baglayin ve mesajlari yonetin</p>
+      </div>
+
+      <div className={cn(
+        "p-4 rounded-lg border",
+        whatsappConnected
+          ? "bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800"
+          : "bg-amber-50 border-amber-200 dark:bg-amber-900/20 dark:border-amber-800"
+      )}>
+        <div className="flex items-center gap-3">
+          <div className={cn(
+            "w-10 h-10 rounded-full flex items-center justify-center",
+            whatsappConnected ? "bg-green-100 dark:bg-green-800" : "bg-amber-100 dark:bg-amber-800"
+          )}>
+            {whatsappConnected ? (
+              <Check className="w-5 h-5 text-green-600 dark:text-green-400" />
+            ) : (
+              <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+            )}
+          </div>
+          <div>
+            <p className={cn(
+              "font-medium",
+              whatsappConnected ? "text-green-700 dark:text-green-400" : "text-amber-700 dark:text-amber-400"
+            )}>
+              {whatsappConnected ? "WhatsApp Bagli" : "WhatsApp Bagli Degil"}
+            </p>
+            <p className={cn(
+              "text-sm",
+              whatsappConnected ? "text-green-600 dark:text-green-500" : "text-amber-600 dark:text-amber-500"
+            )}>
+              {whatsappConnected
+                ? whatsappData.phoneNumber
+                  ? `${whatsappData.phoneNumber} numarasi bagli`
+                  : "WhatsApp Business hesabiniz bagli"
+                : "Mesaj göndermek icin API bilgilerinizi girin"}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {whatsappError && (
+        <div className="flex items-center gap-2 p-4 bg-destructive/10 border border-destructive/20 rounded-lg max-w-lg">
+          <AlertCircle className="w-5 h-5 text-destructive" />
+          <p className="text-sm text-destructive">{whatsappError}</p>
+        </div>
+      )}
+
+      <div className="space-y-4 max-w-lg">
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-1.5">Telefon Numarasi</label>
+          <div className="relative">
+            <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <input
+              type="text"
+              value={whatsappData.phoneNumber}
+              onChange={(e) => setWhatsappData(prev => ({ ...prev, phoneNumber: e.target.value }))}
+              className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm"
+              placeholder="+90 555 123 4567"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-1.5">Phone Number ID</label>
+          <div className="relative">
+            <Smartphone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <input
+              type="text"
+              value={whatsappData.phoneNumberId}
+              onChange={(e) => setWhatsappData(prev => ({ ...prev, phoneNumberId: e.target.value }))}
+              className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-mono text-sm"
+              placeholder="1234567890"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-1.5">WhatsApp Business Account ID</label>
+          <div className="relative">
+            <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <input
+              type="text"
+              value={whatsappData.whatsappBusinessAccountId}
+              onChange={(e) => setWhatsappData(prev => ({ ...prev, whatsappBusinessAccountId: e.target.value }))}
+              className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-mono text-sm"
+              placeholder="1234567890"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-1.5">Access Token</label>
+          <div className="relative">
+            <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <input
+              type={showWhatsappToken ? "text" : "password"}
+              value={whatsappData.accessToken}
+              onChange={(e) => setWhatsappData(prev => ({ ...prev, accessToken: e.target.value }))}
+              className="w-full pl-10 pr-10 py-2.5 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-mono text-sm"
+              placeholder="EAA..."
+            />
+            <button
+              type="button"
+              onClick={() => setShowWhatsappToken(prev => !prev)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
+              {showWhatsappToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">
+            Meta Business Manager&apos;dan alinan WhatsApp Business Access Token.
+          </p>
+        </div>
+
+        <div className="flex items-center justify-between p-4 bg-muted/30 rounded-lg">
+          <div>
+            <p className="text-sm font-medium text-foreground">Aktif</p>
+            <p className="text-xs text-muted-foreground">WhatsApp mesajlari icin baglantiyi kullan</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setWhatsappData(prev => ({ ...prev, isActive: !prev.isActive }))}
+            className={cn(
+              "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+              whatsappData.isActive ? "bg-primary" : "bg-muted"
+            )}
+          >
+            <span
+              className={cn(
+                "inline-block h-4 w-4 transform rounded-full bg-white transition-transform",
+                whatsappData.isActive ? "translate-x-6" : "translate-x-1"
+              )}
+            />
+          </button>
+        </div>
+
+        <div className="flex items-center gap-3 pt-2">
+          <button
+            onClick={() => void handleWhatsappSave()}
+            disabled={
+              !whatsappData.phoneNumber ||
+              !whatsappData.phoneNumberId ||
+              !whatsappData.accessToken
+            }
+            className="flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Save className="w-4 h-4" />
+            {whatsappConnected ? "Guncelle" : "Baglan"}
+          </button>
+          {whatsappConnected && (
+            <button
+              onClick={() => void handleWhatsappDisconnect()}
+              className="px-5 py-2.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors font-medium"
+            >
+              Baglantiyi Kes
+            </button>
+          )}
+          {whatsappSaved && (
+            <span className="flex items-center gap-1.5 text-sm text-green-600">
+              <Check className="w-4 h-4" />
+              Kaydedildi
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="pt-6 border-t border-border">
+        <h4 className="text-sm font-semibold text-foreground mb-3">WhatsApp Business API Bilgileri Nasil Alinir?</h4>
+        <div className="space-y-2">
+          {[
+            "Meta Business Manager'a gidin (business.facebook.com)",
+            "WhatsApp Business hesabinizi olusturun veya baglayin",
+            "Meta for Developers'a gidin (developers.facebook.com)",
+            "WhatsApp Business API urununu ekleyin",
+            "Phone Number ID ve WhatsApp Business Account ID bilgilerini alin",
+            "Access token olusturun ve kaydedin",
+          ].map((step, index) => (
+            <div key={index} className="flex items-start gap-3">
+              <span className="flex-shrink-0 w-5 h-5 rounded-full bg-primary/10 text-primary text-xs font-medium flex items-center justify-center">
+                {index + 1}
+              </span>
+              <p className="text-sm text-muted-foreground">{step}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+
   const renderNotificationsTab = () => (
     <div className="space-y-6">
       <div>
@@ -839,7 +1450,7 @@ export function SettingsView({ user }: SettingsViewProps) {
       {/* Notification Channels */}
       <div className="space-y-4">
         <h4 className="text-sm font-semibold text-foreground">Bildirim Kanallari</h4>
-        
+
         {[
           { key: "emailNotifications", label: "E-posta Bildirimleri", description: "Onemli guncellemeleri e-posta ile alin", icon: Mail },
           { key: "pushNotifications", label: "Push Bildirimleri", description: "Tarayici bildirimleri alin", icon: Bell },
@@ -876,7 +1487,7 @@ export function SettingsView({ user }: SettingsViewProps) {
       {/* Notification Types */}
       <div className="pt-6 border-t border-border space-y-4">
         <h4 className="text-sm font-semibold text-foreground">Bildirim Turleri</h4>
-        
+
         {[
           { key: "newReservation", label: "Yeni Rezervasyon", description: "Yeni bir rezervasyon yapildiginda" },
           { key: "reservationReminder", label: "Rezervasyon Hatirlatici", description: "Yaklasan rezervasyonlar icin hatirlatma" },
@@ -976,6 +1587,10 @@ export function SettingsView({ user }: SettingsViewProps) {
         return renderSecurityTab()
       case "google":
         return renderGoogleTab()
+      case "instagram":
+        return renderInstagramTab()
+      case "whatsapp":
+        return renderWhatsappTab()
       case "notifications":
         return renderNotificationsTab()
       case "appearance":

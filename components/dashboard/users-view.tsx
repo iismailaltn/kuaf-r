@@ -416,33 +416,33 @@ export function UsersView({ businessUserId, businessUsername }: UsersViewProps) 
       {/* Stats Cards */}
       <div className="grid grid-cols-3 gap-4">
         <div className="p-5 bg-card rounded-2xl border border-border">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+          <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-3">
+            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
               <Users className="w-5 h-5 text-primary" />
             </div>
-            <div>
+            <div className="text-center sm:text-left">
               <p className="text-2xl font-bold text-foreground">{stats.total}</p>
               <p className="text-xs text-muted-foreground">Toplam Calisan</p>
             </div>
           </div>
         </div>
         <div className="p-5 bg-card rounded-2xl border border-border">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
+          <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center shrink-0">
               <UserCheck className="w-5 h-5 text-emerald-600" />
             </div>
-            <div>
+            <div className="text-center sm:text-left">
               <p className="text-2xl font-bold text-foreground">{stats.active}</p>
               <p className="text-xs text-muted-foreground">Aktif Calisan</p>
             </div>
           </div>
         </div>
         <div className="p-5 bg-card rounded-2xl border border-border">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center">
+          <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-3">
+            <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center shrink-0">
               <UserX className="w-5 h-5 text-red-600" />
             </div>
-            <div>
+            <div className="text-center sm:text-left">
               <p className="text-2xl font-bold text-foreground">{stats.passive}</p>
               <p className="text-xs text-muted-foreground">Pasif Calisan</p>
             </div>

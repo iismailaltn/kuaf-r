@@ -38,6 +38,10 @@ function getField(row: Record<string, unknown> | null | undefined, candidates: s
   return undefined
 }
 
+function isActiveValue(value: unknown) {
+  return value === true || value === 1 || value === "1" || value === "true"
+}
+
 function findCorporateProfileByUserId(rows: Record<string, unknown>[], userId: string) {
   return rows.find((row) => String(getField(row, ["user_id", "userId"]) ?? "").trim() === userId) ?? null
 }
@@ -54,6 +58,7 @@ function mapMembershipRow(profile: Record<string, unknown> | null, userIsActive:
   const timeRemaining = userIsActive
     ? getMembershipTimeRemaining(subscriptionStartsAt, subscriptionEndsAt)
     : null
+  const pendingUpgradeRequest = isActiveValue(getField(profile, ["pending_upgrade_request", "pendingUpgradeRequest"]))
 
   return {
     membershipPlan,
@@ -62,6 +67,7 @@ function mapMembershipRow(profile: Record<string, unknown> | null, userIsActive:
     timeRemaining,
     isApproved: userIsActive,
     hasSelectedPlan: Boolean(membershipPlan),
+    pendingUpgradeRequest,
   }
 }
 
@@ -103,8 +109,18 @@ export async function GET(req: Request) {
       return apiJson({ ok: false, message: businessError }, 400)
     }
 
-    const { membership } = await loadMembershipContext(businessUserId)
-    return apiJson({ ok: true, membership })
+    const { profile, membership } = await loadMembershipContext(businessUserId)
+    return apiJson({
+      ok: true,
+      membership,
+      profile: profile
+        ? {
+            businessName: String(getField(profile, ["business_name", "businessName"]) ?? "").trim(),
+            ownerFirstName: String(getField(profile, ["owner_first_name", "ownerFirstName"]) ?? "").trim(),
+            ownerLastName: String(getField(profile, ["owner_last_name", "ownerLastName"]) ?? "").trim(),
+          }
+        : null,
+    })
   } catch (err) {
     const axiosErr = err as AxiosError | undefined
     return apiJson({ ok: false, message: "Uyelik bilgileri getirilemedi.", error: axiosErr?.message ?? String(err) },
@@ -149,6 +165,26 @@ export async function PUT(req: Request) {
       if (!membership.isApproved) {
         return apiJson({ ok: false, message: "Yukseltme icin onayli uyelik gerekir." }, 400)
       }
+    }
+
+    if (action === "request_upgrade") {
+      if (membership.membershipPlan !== "basic") {
+        return apiJson({ ok: false, message: "Yukseltme yalnizca baslangic paketinden yapilabilir." }, 400)
+      }
+      if (!membership.isApproved) {
+        return apiJson({ ok: false, message: "Yukseltme icin onayli uyelik gerekir." }, 400)
+      }
+      if (plan !== "professional") {
+        return apiJson({ ok: false, message: "Sadece profesyonel pakete yukseltme talebi yapilabilir." }, 400)
+      }
+
+      await sqlToken(
+        corporateToken,
+        `UPDATE corporate_profiles SET pending_upgrade_request=1 WHERE user_id=${businessUserId}`,
+      )
+
+      const refreshed = await loadMembershipContext(businessUserId)
+      return apiJson({ ok: true, membership: refreshed.membership })
     }
 
     await sqlToken(

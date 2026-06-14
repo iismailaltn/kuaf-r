@@ -1,244 +1,243 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useSalonServices } from "@/hooks/use-salon-services"
+import { useServiceStages } from "@/hooks/use-service-stages"
+import { useReservations } from "@/hooks/use-reservations"
+import {
+  canonicalStaffIdFromPersonelRow,
+  fetchPersonelRowsForBusiness,
+} from "@/lib/personel-directory"
+import { buildMultiServicePlan } from "@/lib/salon-service-stages"
+import {
+  buildReservationTimeline,
+  canStaffTakeBooking,
+  DEFAULT_WORKING_HOURS,
+  formatMinutesToTime,
+  isStaffBusyAtClockTime,
+  parseTimeToMinutes,
+  type StaffReservationConflictInput,
+} from "@/lib/reservation-scheduling"
+import { reservationToBusyBlocksForConflict } from "@/lib/reservations-db"
+import type { ReservationRecord } from "@/lib/reservations-store"
+import { StaffPickerGrid, StaffScheduleSheet, type StaffProfile } from "@/components/dashboard/staff-schedule-ui"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
+import { ChevronLeft, ChevronRight, X, Calendar, CheckCircle, Phone } from "lucide-react"
 import {
-  ChevronLeft,
-  ChevronRight,
-  Plus,
-  X,
-  Clock,
-  User,
-  Scissors,
-  Users,
-  Calendar,
-  Phone,
-  FileText,
-  Globe,
-  CheckCircle,
-} from "lucide-react"
-
-interface Reservation {
-  id: string
-  date: string // YYYY-MM-DD
-  time: string // HH:MM
-  customerName: string
-  customerSurname: string
-  phone: string
-  services: string[]
-  staffId: string
-  staffName: string
-  notes: string
-  source: "website" | "manual"
-  status: "pending" | "confirmed" | "completed" | "cancelled"
-}
-
-// Ornek personel listesi
-const staffList = [
-  { id: "EMP001", name: "Ahmet Yilmaz", specialties: ["Sac Kesimi", "Sakal Kesimi"] },
-  { id: "EMP002", name: "Ayse Kaya", specialties: ["Sac Boyama", "Fon", "Makyaj"] },
-  { id: "EMP003", name: "Mehmet Demir", specialties: ["Sac Kesimi", "Sac Boyama"] },
-  { id: "EMP004", name: "Fatma Celik", specialties: ["Manikur", "Pedikur", "Cilt Bakimi"] },
-  { id: "EMP005", name: "Ali Ozturk", specialties: ["Kas Dizayn", "Agda"] },
-]
-
-// Calisma saatleri
-const workingHours = [
-  "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
-  "12:00", "12:30", "13:00", "13:30", "14:00", "14:30",
-  "15:00", "15:30", "16:00", "16:30", "17:00", "17:30",
-  "18:00", "18:30", "19:00", "19:30", "20:00",
-]
-
-// Ornek rezervasyonlar
-const initialReservations: Reservation[] = [
-  {
-    id: "RES001",
-    date: "2026-04-19",
-    time: "10:00",
-    customerName: "Zeynep",
-    customerSurname: "Aydin",
-    phone: "0532 123 45 67",
-    services: ["Sac Kesimi", "Fon"],
-    staffId: "EMP002",
-    staffName: "Ayse Kaya",
-    notes: "Ilk kez geliyor",
-    source: "website",
-    status: "confirmed",
-  },
-  {
-    id: "RES002",
-    date: "2026-04-19",
-    time: "14:30",
-    customerName: "Murat",
-    customerSurname: "Koc",
-    phone: "0533 987 65 43",
-    services: ["Sakal Kesimi"],
-    staffId: "EMP001",
-    staffName: "Ahmet Yilmaz",
-    notes: "",
-    source: "manual",
-    status: "pending",
-  },
-  {
-    id: "RES003",
-    date: "2026-04-20",
-    time: "11:00",
-    customerName: "Elif",
-    customerSurname: "Celik",
-    phone: "0534 456 78 90",
-    services: ["Manikur", "Pedikur"],
-    staffId: "EMP004",
-    staffName: "Fatma Celik",
-    notes: "Ozel tasarim istegi var",
-    source: "website",
-    status: "confirmed",
-  },
-  {
-    id: "RES004",
-    date: "2026-04-26",
-    time: "15:00",
-    customerName: "Burak",
-    customerSurname: "Yilmaz",
-    phone: "0535 111 22 33",
-    services: ["Sac Kesimi", "Sac Boyama"],
-    staffId: "EMP003",
-    staffName: "Mehmet Demir",
-    notes: "",
-    source: "manual",
-    status: "confirmed",
-  },
-]
+  formatTurkishPhoneSuffix,
+  parseTurkishPhoneInput,
+  toFullTurkishPhone,
+} from "@/lib/auth-field-validation"
 
 const turkishMonths = [
   "Ocak", "Subat", "Mart", "Nisan", "Mayis", "Haziran",
-  "Temmuz", "Agustos", "Eylul", "Ekim", "Kasim", "Aralik"
+  "Temmuz", "Agustos", "Eylul", "Ekim", "Kasim", "Aralik",
 ]
 
 const turkishDays = ["Pzr", "Pzt", "Sal", "Car", "Per", "Cum", "Cmt"]
+
 
 interface ReservationsViewProps {
   businessUserId?: string
 }
 
+function toConflictInputs(reservations: ReservationRecord[]): StaffReservationConflictInput[] {
+  return reservations.map((r) => ({
+    date: r.date,
+    staffId: r.staffId,
+    staffBusyBlocks: reservationToBusyBlocksForConflict(r),
+    status: r.status,
+  }))
+}
+
 export function ReservationsView({ businessUserId }: ReservationsViewProps) {
-  const { serviceNames: serviceOptions } = useSalonServices(businessUserId)
-  const [reservations, setReservations] = useState<Reservation[]>(initialReservations)
+  const { activeServices } = useSalonServices(businessUserId)
+  const { getStagesForService } = useServiceStages(businessUserId, activeServices)
+  const { reservations, isLoading, error, createReservation } = useReservations(businessUserId)
+
+  const [staffList, setStaffList] = useState<StaffProfile[]>([])
+  const [scheduleStaff, setScheduleStaff] = useState<StaffProfile | null>(null)
+  const [scheduleSheetOpen, setScheduleSheetOpen] = useState(false)
   const [currentDate, setCurrentDate] = useState(new Date())
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
-  const [showTimeSlots, setShowTimeSlots] = useState(false)
+  const [showDayPanel, setShowDayPanel] = useState(false)
   const [showReservationModal, setShowReservationModal] = useState(false)
   const [selectedTime, setSelectedTime] = useState<string | null>(null)
-  
+
   const [reservationForm, setReservationForm] = useState({
     customerName: "",
     customerSurname: "",
     phone: "",
-    services: [] as string[],
+    serviceIds: [] as number[],
     staffId: "",
     notes: "",
   })
 
-  // Takvim hesaplamalari
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setReservationForm({ ...reservationForm, phone: parseTurkishPhoneInput(e.target.value) })
+  }
+
+  useEffect(() => {
+    if (!businessUserId) {
+      setStaffList([])
+      return
+    }
+    void fetchPersonelRowsForBusiness(businessUserId).then((rows) => {
+      const mapped = rows
+        .map((row) => {
+          const id = canonicalStaffIdFromPersonelRow(row as Record<string, unknown>)
+          const firstName = String(row.first_name ?? row.firstName ?? "").trim()
+          const lastName = String(row.last_name ?? row.lastName ?? "").trim()
+          const fullName = String(row.full_name ?? row.fullName ?? `${firstName} ${lastName}`).trim()
+          const phone = String(row.phone ?? "").trim()
+          const role = String(row.role ?? row.expertise ?? "").trim()
+          if (!id || !fullName) return null
+          const staff: StaffProfile = {
+            id,
+            firstName: firstName || fullName.split(/\s+/)[0] || fullName,
+            lastName: lastName || fullName.split(/\s+/).slice(1).join(" "),
+            fullName,
+          }
+          if (phone) staff.phone = phone
+          if (role) staff.role = role
+          return staff
+        })
+        .filter((item): item is StaffProfile => item !== null)
+      setStaffList(mapped)
+    })
+  }, [businessUserId])
+
+  const conflictInputs = useMemo(() => toConflictInputs(reservations), [reservations])
+
+  const bookingPlan = useMemo(() => {
+    const items = reservationForm.serviceIds
+      .map((serviceId) => {
+        const service = activeServices.find((item) => item.id === serviceId)
+        if (!service) return null
+        return {
+          serviceId: service.id,
+          serviceName: service.name,
+          stages: getStagesForService(service),
+        }
+      })
+      .filter((item): item is NonNullable<typeof item> => item !== null)
+
+    if (items.length === 0) {
+      return null
+    }
+    return buildMultiServicePlan(items)
+  }, [reservationForm.serviceIds, activeServices, getStagesForService])
+
   const year = currentDate.getFullYear()
   const month = currentDate.getMonth()
 
   const firstDayOfMonth = new Date(year, month, 1)
-  const lastDayOfMonth = new Date(year, month + 1, 0)
-  const daysInMonth = lastDayOfMonth.getDate()
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
   const startingDay = firstDayOfMonth.getDay()
-
-  // Onceki ayin gunleri
   const prevMonthLastDay = new Date(year, month, 0).getDate()
-  const prevMonthDays = Array.from(
-    { length: startingDay },
-    (_, i) => prevMonthLastDay - startingDay + i + 1
-  )
-
-  // Bu ayin gunleri
+  const prevMonthDays = Array.from({ length: startingDay }, (_, i) => prevMonthLastDay - startingDay + i + 1)
   const currentMonthDays = Array.from({ length: daysInMonth }, (_, i) => i + 1)
-
-  // Sonraki ayin gunleri (42 - toplam gun sayisi)
   const totalCells = 42
   const nextMonthDays = Array.from(
     { length: totalCells - prevMonthDays.length - currentMonthDays.length },
-    (_, i) => i + 1
+    (_, i) => i + 1,
   )
 
-  // Secili gundeki rezervasyonlar
   const selectedDateReservations = useMemo(() => {
     if (!selectedDate) return []
-    return reservations.filter((r) => r.date === selectedDate)
+    return reservations.filter((r) => r.date === selectedDate && r.status !== "cancelled")
   }, [selectedDate, reservations])
 
-  // Bir gundeki rezervasyon sayisini al
   const getReservationCount = (day: number) => {
     const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`
-    return reservations.filter((r) => r.date === dateStr).length
+    return reservations.filter((r) => r.date === dateStr && r.status !== "cancelled").length
   }
 
-  // Bir saatin dolu olup olmadigini kontrol et
-  const isTimeSlotOccupied = (time: string) => {
-    return selectedDateReservations.some((r) => r.time === time)
+  const getStaffReservations = (staffId: string) =>
+    selectedDateReservations.filter((r) => String(r.staffId) === String(staffId))
+
+  const canStaffStartAt = (staffId: string, time: string) => {
+    if (!selectedDate) return false
+    if (bookingPlan) {
+      return canStaffTakeBooking(
+        selectedDate,
+        staffId,
+        time,
+        bookingPlan.staffBusyBlocks,
+        conflictInputs,
+      )
+    }
+    return !isStaffBusyAtClockTime(staffId, selectedDate, time, conflictInputs)
   }
 
-  // Ay degistirme
+  /** Kart veya bos slot: ara dakikalari (baska personelin isi dahil) gostermiyoruz. */
+  const getVisibleSlotsForStaff = (staffId: string) =>
+    DEFAULT_WORKING_HOURS.filter((time) => {
+      const hasCard = getStaffReservations(staffId).some((r) => r.startTime === time)
+      if (hasCard) return true
+      if (!selectedDate) return false
+      if (isStaffBusyAtClockTime(staffId, selectedDate, time, conflictInputs)) return false
+      return true
+    })
+
   const goToPrevMonth = () => {
     setCurrentDate(new Date(year, month - 1, 1))
     setSelectedDate(null)
-    setShowTimeSlots(false)
+    setShowDayPanel(false)
   }
 
   const goToNextMonth = () => {
     setCurrentDate(new Date(year, month + 1, 1))
     setSelectedDate(null)
-    setShowTimeSlots(false)
+    setShowDayPanel(false)
   }
 
-  // Gun secme
   const handleDayClick = (day: number) => {
     const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`
     setSelectedDate(dateStr)
-    setShowTimeSlots(true)
+    setShowDayPanel(true)
   }
 
-  // Saat secme ve modal acma
-  const handleTimeSlotClick = (time: string) => {
-    if (isTimeSlotOccupied(time)) return
+  const openReservationModal = (staffId: string, time: string) => {
     setSelectedTime(time)
     setReservationForm({
       customerName: "",
       customerSurname: "",
       phone: "",
-      services: [],
-      staffId: "",
+      serviceIds: [],
+      staffId,
       notes: "",
     })
     setShowReservationModal(true)
   }
 
-  // Hizmet secimi toggle
-  const toggleService = (service: string) => {
-    if (reservationForm.services.includes(service)) {
-      setReservationForm({
-        ...reservationForm,
-        services: reservationForm.services.filter((s) => s !== service),
-      })
-    } else {
-      setReservationForm({
-        ...reservationForm,
-        services: [...reservationForm.services, service],
-      })
-    }
+  const handleSelectStaff = (staff: StaffProfile) => {
+    setScheduleStaff(staff)
+    setScheduleSheetOpen(true)
   }
 
-  // Rezervasyon olusturma
-  const handleCreateReservation = () => {
-    if (!selectedDate || !selectedTime) return
+  const handlePickTimeFromSheet = (time: string) => {
+    if (!scheduleStaff) return
+    setScheduleSheetOpen(false)
+    openReservationModal(scheduleStaff.id, time)
+  }
+
+  const toggleService = (serviceId: number) => {
+    setReservationForm((prev) => ({
+      ...prev,
+      serviceIds: prev.serviceIds.includes(serviceId)
+        ? prev.serviceIds.filter((id) => id !== serviceId)
+        : [...prev.serviceIds, serviceId],
+    }))
+  }
+
+  const handleCreateReservation = async () => {
+    if (!selectedDate || !selectedTime || !bookingPlan) return
     if (!reservationForm.customerName.trim() || !reservationForm.customerSurname.trim()) {
       alert("Lutfen musteri adi ve soyadini girin.")
       return
@@ -247,7 +246,7 @@ export function ReservationsView({ businessUserId }: ReservationsViewProps) {
       alert("Lutfen telefon numarasini girin.")
       return
     }
-    if (reservationForm.services.length === 0) {
+    if (reservationForm.serviceIds.length === 0) {
       alert("Lutfen en az bir hizmet secin.")
       return
     }
@@ -256,52 +255,57 @@ export function ReservationsView({ businessUserId }: ReservationsViewProps) {
       return
     }
 
+    if (!canStaffStartAt(reservationForm.staffId, selectedTime)) {
+      alert("Bu personel secilen saatte islem bitene kadar mesgul.")
+      return
+    }
+
+    const timeline = buildReservationTimeline(selectedTime, bookingPlan.stages, bookingPlan.staffBusyBlocks)
+    if (!timeline) {
+      alert("Gecersiz saat.")
+      return
+    }
+
+    const fullPhone = toFullTurkishPhone(reservationForm.phone)
     const selectedStaff = staffList.find((s) => s.id === reservationForm.staffId)
-    const newReservation: Reservation = {
-      id: `RES${Date.now()}`,
+    const result = await createReservation({
       date: selectedDate,
-      time: selectedTime,
+      startTime: selectedTime,
+      endTime: timeline.endTime,
       customerName: reservationForm.customerName.trim(),
       customerSurname: reservationForm.customerSurname.trim(),
-      phone: reservationForm.phone.trim(),
-      services: reservationForm.services,
-      staffId: reservationForm.staffId,
-      staffName: selectedStaff?.name ?? "",
+      phone: fullPhone,
+      serviceIds: reservationForm.serviceIds,
+      serviceNames: bookingPlan.plans.map((plan) => plan.serviceName),
+      staffId: selectedStaff?.id ?? reservationForm.staffId,
+      staffName: selectedStaff?.fullName ?? "",
       notes: reservationForm.notes.trim(),
       source: "manual",
       status: "confirmed",
+      totalMinutes: bookingPlan.totalMinutes,
+      stages: timeline.stages,
+      staffBusyBlocks: timeline.staffBusyBlocks,
+    })
+
+    if (!result.ok) {
+      alert(String(result.message ?? "Randevu kaydedilemedi."))
+      return
     }
 
-    setReservations([...reservations, newReservation])
     setShowReservationModal(false)
     setSelectedTime(null)
   }
 
-  // Modal kapatma
   const closeReservationModal = () => {
     setShowReservationModal(false)
     setSelectedTime(null)
-    setReservationForm({
-      customerName: "",
-      customerSurname: "",
-      phone: "",
-      services: [],
-      staffId: "",
-      notes: "",
-    })
   }
 
-  // Bugun mu kontrol
   const isToday = (day: number) => {
     const today = new Date()
-    return (
-      day === today.getDate() &&
-      month === today.getMonth() &&
-      year === today.getFullYear()
-    )
+    return day === today.getDate() && month === today.getMonth() && year === today.getFullYear()
   }
 
-  // Tarihi formatla
   const formatSelectedDate = () => {
     if (!selectedDate) return ""
     const [y, m, d] = selectedDate.split("-").map(Number)
@@ -309,450 +313,284 @@ export function ReservationsView({ businessUserId }: ReservationsViewProps) {
     return `${d} ${turkishMonths[m - 1]} ${y}, ${turkishDays[date.getDay()]}`
   }
 
+  const modalStaff = staffList.find((s) => s.id === reservationForm.staffId)
+  const scheduleBookings = scheduleStaff ? getStaffReservations(scheduleStaff.id) : []
+  const scheduleVisibleSlots = scheduleStaff ? getVisibleSlotsForStaff(scheduleStaff.id) : []
+
   return (
     <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-foreground">Rezervasyonlar</h1>
-          <p className="text-muted-foreground mt-1">Takvimden gun secin ve rezervasyon olusturun</p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-semibold text-foreground">Rezervasyonlar</h1>
+        <p className="text-muted-foreground mt-1">
+          Personel seçin, müsait saatleri görün
+          {isLoading ? " · Yükleniyor..." : ""}
+          {error ? ` · ${error}` : ""}
+        </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Takvim */}
-        <div className="lg:col-span-2 bg-card rounded-2xl border border-border p-6">
-          {/* Takvim Header */}
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-semibold text-foreground">
-              {turkishMonths[month]} {year}
-            </h2>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="icon"
-                className="rounded-xl"
-                onClick={goToPrevMonth}
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                className="rounded-xl"
-                onClick={goToNextMonth}
-              >
-                <ChevronRight className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
-
-          {/* Gun isimleri */}
-          <div className="grid grid-cols-7 gap-1 mb-2">
-            {turkishDays.map((day) => (
-              <div
-                key={day}
-                className="text-center text-sm font-medium text-muted-foreground py-2"
-              >
-                {day}
-              </div>
-            ))}
-          </div>
-
-          {/* Gunler */}
-          <div className="grid grid-cols-7 gap-1">
-            {/* Onceki ayin gunleri */}
-            {prevMonthDays.map((day) => (
-              <div
-                key={`prev-${day}`}
-                className="aspect-square p-1 flex flex-col items-center justify-center text-muted-foreground/40"
-              >
-                <span className="text-sm">{day}</span>
-              </div>
-            ))}
-
-            {/* Bu ayin gunleri */}
-            {currentMonthDays.map((day) => {
-              const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`
-              const reservationCount = getReservationCount(day)
-              const isSelected = selectedDate === dateStr
-
-              return (
-                <button
-                  key={`current-${day}`}
-                  onClick={() => handleDayClick(day)}
-                  className={cn(
-                    "aspect-square p-1 flex flex-col items-center justify-center rounded-xl transition-all relative",
-                    isToday(day) && !isSelected && "bg-primary/10 text-primary",
-                    isSelected && "bg-primary text-primary-foreground",
-                    !isSelected && !isToday(day) && "hover:bg-muted"
-                  )}
-                >
-                  <span className="text-sm font-medium">{day}</span>
-                  {reservationCount > 0 && (
-                    <div
-                      className={cn(
-                        "absolute bottom-1 flex gap-0.5",
-                        reservationCount > 3 ? "justify-center" : ""
-                      )}
-                    >
-                      {reservationCount <= 3 ? (
-                        Array.from({ length: reservationCount }).map((_, i) => (
-                          <div
-                            key={i}
-                            className={cn(
-                              "w-1.5 h-1.5 rounded-full",
-                              isSelected ? "bg-primary-foreground" : "bg-emerald-500"
-                            )}
-                          />
-                        ))
-                      ) : (
-                        <span
-                          className={cn(
-                            "text-[10px] font-medium",
-                            isSelected ? "text-primary-foreground" : "text-emerald-600"
-                          )}
-                        >
-                          {reservationCount}
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </button>
-              )
-            })}
-
-            {/* Sonraki ayin gunleri */}
-            {nextMonthDays.map((day) => (
-              <div
-                key={`next-${day}`}
-                className="aspect-square p-1 flex flex-col items-center justify-center text-muted-foreground/40"
-              >
-                <span className="text-sm">{day}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Saat Slotlari / Rezervasyonlar */}
-        <div className="bg-card rounded-2xl border border-border p-6">
-          {showTimeSlots && selectedDate ? (
-            <>
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h3 className="font-semibold text-foreground">{formatSelectedDate()}</h3>
-                  <p className="text-sm text-muted-foreground mt-0.5">
-                    {selectedDateReservations.length} rezervasyon
-                  </p>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="rounded-xl"
-                  onClick={() => {
-                    setShowTimeSlots(false)
-                    setSelectedDate(null)
-                  }}
-                >
-                  <X className="w-4 h-4" />
-                </Button>
-              </div>
-
-              {/* Saat listesi */}
-              <div className="space-y-2 max-h-[500px] overflow-y-auto pr-2">
-                {workingHours.map((time) => {
-                  const reservation = selectedDateReservations.find((r) => r.time === time)
-                  const isOccupied = !!reservation
-
-                  return (
-                    <button
-                      key={time}
-                      onClick={() => handleTimeSlotClick(time)}
-                      disabled={isOccupied}
-                      className={cn(
-                        "w-full p-3 rounded-xl text-left transition-all border",
-                        isOccupied
-                          ? "bg-emerald-50 border-emerald-200 cursor-default"
-                          : "bg-muted/30 border-transparent hover:bg-muted hover:border-muted-foreground/20"
-                      )}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <Clock className={cn(
-                            "w-4 h-4",
-                            isOccupied ? "text-emerald-600" : "text-muted-foreground"
-                          )} />
-                          <span className={cn(
-                            "font-medium",
-                            isOccupied ? "text-emerald-700" : "text-foreground"
-                          )}>
-                            {time}
-                          </span>
-                        </div>
-                        {isOccupied ? (
-                          <span className="text-xs font-medium text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full">
-                            Dolu
-                          </span>
-                        ) : (
-                          <Plus className="w-4 h-4 text-muted-foreground" />
-                        )}
-                      </div>
-                      {reservation && (
-                        <div className="mt-2 space-y-1">
-                          <div className="flex items-center gap-1.5 text-sm text-emerald-700">
-                            <User className="w-3 h-3" />
-                            <span>{reservation.customerName} {reservation.customerSurname}</span>
-                          </div>
-                          <div className="flex items-center gap-1.5 text-xs text-emerald-600/80">
-                            <Scissors className="w-3 h-3" />
-                            <span className="truncate">{reservation.services.join(", ")}</span>
-                          </div>
-                          <div className="flex items-center gap-1.5 text-xs text-emerald-600/80">
-                            <Users className="w-3 h-3" />
-                            <span>{reservation.staffName}</span>
-                          </div>
-                          {reservation.source === "website" && (
-                            <div className="flex items-center gap-1 text-xs text-blue-600 mt-1">
-                              <Globe className="w-3 h-3" />
-                              <span>Web sitesinden</span>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </button>
-                  )
-                })}
-              </div>
-            </>
-          ) : (
-            <div className="h-full flex flex-col items-center justify-center text-center py-12">
-              <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mb-4">
-                <Calendar className="w-8 h-8 text-muted-foreground" />
-              </div>
-              <h3 className="font-medium text-foreground">Gun Secin</h3>
-              <p className="text-sm text-muted-foreground mt-1">
-                Takvimden bir gun secerek<br />rezervasyonlari gorun
-              </p>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Yaklaşan Rezervasyonlar */}
       <div className="bg-card rounded-2xl border border-border p-6">
-        <h3 className="font-semibold text-foreground mb-4">Yaklasan Rezervasyonlar</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {reservations
-            .filter((r) => r.status !== "cancelled" && r.status !== "completed")
-            .sort((a, b) => {
-              const dateA = new Date(`${a.date}T${a.time}`)
-              const dateB = new Date(`${b.date}T${b.time}`)
-              return dateA.getTime() - dateB.getTime()
-            })
-            .slice(0, 6)
-            .map((reservation) => {
-              const [y, m, d] = reservation.date.split("-").map(Number)
-              const formattedDate = `${d} ${turkishMonths[m - 1]}`
-              
-              return (
-                <div
-                  key={reservation.id}
-                  className="p-4 rounded-xl bg-muted/30 border border-border/50 space-y-2"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                        <Calendar className="w-5 h-5 text-primary" />
-                      </div>
-                      <div>
-                        <div className="font-medium text-foreground text-sm">
-                          {formattedDate}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {reservation.time}
-                        </div>
-                      </div>
-                    </div>
-                    <div className={cn(
-                      "px-2 py-0.5 rounded-full text-xs font-medium",
-                      reservation.status === "confirmed"
-                        ? "bg-emerald-100 text-emerald-700"
-                        : "bg-amber-100 text-amber-700"
-                    )}>
-                      {reservation.status === "confirmed" ? "Onaylandi" : "Bekliyor"}
-                    </div>
-                  </div>
-                  <div className="pt-2 border-t border-border/50 space-y-1.5">
-                    <div className="flex items-center gap-1.5 text-sm">
-                      <User className="w-3.5 h-3.5 text-muted-foreground" />
-                      <span className="font-medium">{reservation.customerName} {reservation.customerSurname}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <Phone className="w-3 h-3" />
-                      <span>{reservation.phone}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <Scissors className="w-3 h-3" />
-                      <span className="truncate">{reservation.services.join(", ")}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <Users className="w-3 h-3" />
-                      <span>{reservation.staffName}</span>
-                    </div>
-                    {reservation.source === "website" && (
-                      <div className="flex items-center gap-1 text-xs text-blue-600">
-                        <Globe className="w-3 h-3" />
-                        <span>Web sitesinden</span>
-                      </div>
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-lg font-semibold text-foreground">
+            {turkishMonths[month]} {year}
+          </h2>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="icon" className="rounded-xl" onClick={goToPrevMonth}>
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+            <Button variant="outline" size="icon" className="rounded-xl" onClick={goToNextMonth}>
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-7 gap-1 mb-2">
+          {turkishDays.map((day) => (
+            <div key={day} className="text-center text-sm font-medium text-muted-foreground py-2">
+              {day}
+            </div>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-7 gap-1">
+          {prevMonthDays.map((day) => (
+            <div
+              key={`prev-${day}`}
+              className="h-32 p-1 flex items-center justify-center text-muted-foreground/40"
+            >
+              <span className="text-base">{day}</span>
+            </div>
+          ))}
+          {currentMonthDays.map((day) => {
+            const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`
+            const reservationCount = getReservationCount(day)
+            const isSelected = selectedDate === dateStr
+            return (
+              <button
+                key={`current-${day}`}
+                type="button"
+                onClick={() => handleDayClick(day)}
+                className={cn(
+                  "h-24 p-1 flex flex-col items-center justify-center rounded-xl transition-all relative",
+                  isToday(day) && !isSelected && "bg-primary/10 text-primary",
+                  isSelected && "bg-primary text-primary-foreground",
+                  !isSelected && !isToday(day) && "hover:bg-muted",
+                )}
+              >
+                <span className="text-base font-medium">{day}</span>
+                {reservationCount > 0 && (
+                  <span
+                    className={cn(
+                      "text-xs font-medium mt-0.5",
+                      isSelected ? "text-primary-foreground" : "text-emerald-600",
                     )}
-                  </div>
-                </div>
-              )
-            })}
+                  >
+                    {reservationCount}
+                  </span>
+                )}
+              </button>
+            )
+          })}
+          {nextMonthDays.map((day) => (
+            <div
+              key={`next-${day}`}
+              className="h-32 p-1 flex items-center justify-center text-muted-foreground/40"
+            >
+              <span className="text-base">{day}</span>
+            </div>
+          ))}
         </div>
       </div>
 
-      {/* Rezervasyon Olusturma Modal */}
+      {showDayPanel && selectedDate ? (
+        <Card className="gap-0 py-0 overflow-hidden">
+          <CardHeader className="flex flex-row items-center justify-between border-b px-6 py-5 [.border-b]:pb-5">
+            <div>
+              <CardTitle>{formatSelectedDate()}</CardTitle>
+              <CardDescription className="mt-1">
+                Personel kartına tıklayın, müsait saatleri seçin
+              </CardDescription>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="rounded-xl shrink-0"
+              onClick={() => {
+                setShowDayPanel(false)
+                setSelectedDate(null)
+              }}
+            >
+              <X className="w-4 h-4" />
+            </Button>
+          </CardHeader>
+
+          <CardContent className="p-4 sm:p-6">
+            {staffList.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">Personel bulunamadi.</p>
+            ) : (
+              <StaffPickerGrid
+                staffList={staffList}
+                getBookings={getStaffReservations}
+                getVisibleSlots={getVisibleSlotsForStaff}
+                onSelectStaff={handleSelectStaff}
+              />
+            )}
+          </CardContent>
+        </Card>
+      ) : (
+        <Card className="border-dashed">
+          <CardContent className="flex flex-col items-center justify-center py-14 text-center">
+            <Calendar className="w-10 h-10 text-muted-foreground mb-4 opacity-60" />
+            <p className="font-medium text-foreground">Gun secin</p>
+            <p className="text-sm text-muted-foreground mt-1 max-w-sm">
+              Personel bazli program icin takvimden bir gun secin
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      <StaffScheduleSheet
+        open={scheduleSheetOpen}
+        onOpenChange={setScheduleSheetOpen}
+        staff={scheduleStaff}
+        dateLabel={formatSelectedDate()}
+        bookings={scheduleBookings}
+        visibleSlots={scheduleVisibleSlots}
+        onPickTime={handlePickTimeFromSheet}
+      />
+
       {showReservationModal && selectedDate && selectedTime && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-card rounded-3xl shadow-2xl animate-in fade-in zoom-in-95 duration-200">
-            {/* Header */}
-            <div className="sticky top-0 z-10 relative bg-gradient-to-br from-emerald-600 to-teal-600 px-6 py-5">
+          <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-card rounded-3xl shadow-2xl">
+            <div className="sticky top-0 z-10 bg-gradient-to-br from-emerald-600 to-teal-600 px-6 py-5">
               <button
+                type="button"
                 onClick={closeReservationModal}
-                className="absolute top-4 right-4 p-1.5 rounded-full bg-white/20 hover:bg-white/30 transition-colors"
+                className="absolute top-4 right-4 p-1.5 rounded-full bg-white/20"
               >
                 <X className="w-4 h-4 text-white" />
               </button>
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center">
-                  <Calendar className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-semibold text-white">Yeni Rezervasyon</h2>
-                  <p className="text-sm text-white/70">
-                    {formatSelectedDate()} - {selectedTime}
-                  </p>
-                </div>
-              </div>
+              <h2 className="text-lg font-semibold text-white">Yeni Rezervasyon</h2>
+              <p className="text-sm text-white/80">
+                {formatSelectedDate()} · {modalStaff?.fullName ?? "Personel"} · {selectedTime}
+                {bookingPlan
+                  ? ` → ${formatMinutesToTime(parseTimeToMinutes(selectedTime) + bookingPlan.totalMinutes)}`
+                  : ""}
+              </p>
             </div>
 
-            {/* Form */}
             <div className="p-6 space-y-6">
-              {/* Musteri Bilgileri */}
-              <div className="space-y-4">
-                <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-                  <User className="w-4 h-4" />
-                  Musteri Bilgileri
-                </h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-foreground">Ad *</label>
-                    <Input
-                      placeholder="Musteri adi"
-                      value={reservationForm.customerName}
-                      onChange={(e) => setReservationForm({ ...reservationForm, customerName: e.target.value })}
-                      className="rounded-xl h-11"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-foreground">Soyad *</label>
-                    <Input
-                      placeholder="Musteri soyadi"
-                      value={reservationForm.customerSurname}
-                      onChange={(e) => setReservationForm({ ...reservationForm, customerSurname: e.target.value })}
-                      className="rounded-xl h-11"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground">Telefon *</label>
-                  <Input
-                    placeholder="0532 123 45 67"
-                    value={reservationForm.phone}
-                    onChange={(e) => setReservationForm({ ...reservationForm, phone: e.target.value })}
-                    className="rounded-xl h-11"
+              <div className="grid grid-cols-2 gap-4">
+                <Input
+                  placeholder="Ad *"
+                  value={reservationForm.customerName}
+                  onChange={(e) => setReservationForm({ ...reservationForm, customerName: e.target.value })}
+                  className="rounded-xl"
+                />
+                <Input
+                  placeholder="Soyad *"
+                  value={reservationForm.customerSurname}
+                  onChange={(e) => setReservationForm({ ...reservationForm, customerSurname: e.target.value })}
+                  className="rounded-xl"
+                />
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-sm font-medium text-muted-foreground">Telefon *</h3>
+                <div
+                  className={cn(
+                    "flex items-center h-12 w-full rounded-xl border border-border bg-muted/50",
+                    "focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background"
+                  )}
+                >
+                  <Phone className="ml-3 w-5 h-5 shrink-0 text-muted-foreground" />
+                  <span className="pl-2 text-foreground tabular-nums select-none">0</span>
+                  <input
+                    type="tel"
+                    inputMode="numeric"
+                    placeholder="(5xx) xxx xx xx"
+                    value={formatTurkishPhoneSuffix(reservationForm.phone)}
+                    onChange={handlePhoneChange}
+                    className="flex-1 min-w-0 h-full bg-transparent px-1 text-foreground outline-none placeholder:text-muted-foreground"
+                    required
                   />
                 </div>
               </div>
 
-              {/* Hizmet Secimi */}
-              <div className="space-y-4">
-                <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-                  <Scissors className="w-4 h-4" />
-                  Yapilacak Islemler *
-                </h3>
+              <div className="space-y-2">
+                <h3 className="text-sm font-medium text-muted-foreground">Hizmetler *</h3>
                 <div className="flex flex-wrap gap-2">
-                  {serviceOptions.map((service) => (
+                  {activeServices.map((service) => (
                     <button
-                      key={service}
+                      key={service.id}
                       type="button"
-                      onClick={() => toggleService(service)}
+                      onClick={() => toggleService(service.id)}
                       className={cn(
                         "px-4 py-2 rounded-xl text-sm font-medium transition-all",
-                        reservationForm.services.includes(service)
-                          ? "bg-emerald-600 text-white shadow-lg shadow-emerald-600/25"
-                          : "bg-muted hover:bg-muted/80 text-muted-foreground"
+                        reservationForm.serviceIds.includes(service.id)
+                          ? "bg-emerald-600 text-white"
+                          : "bg-muted text-muted-foreground",
                       )}
                     >
-                      {service}
+                      {service.name}
                     </button>
                   ))}
                 </div>
               </div>
 
-              {/* Personel Secimi */}
-              <div className="space-y-4">
-                <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-                  <Users className="w-4 h-4" />
-                  Personel Secimi *
-                </h3>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  {staffList.map((staff) => (
-                    <button
-                      key={staff.id}
-                      type="button"
-                      onClick={() => setReservationForm({ ...reservationForm, staffId: staff.id })}
-                      className={cn(
-                        "p-3 rounded-xl text-left transition-all border-2",
-                        reservationForm.staffId === staff.id
-                          ? "bg-emerald-50 border-emerald-500 text-emerald-700"
-                          : "bg-muted/50 border-transparent hover:border-muted-foreground/20"
-                      )}
+              {bookingPlan ? (
+                <div className="rounded-xl border border-border/60 bg-muted/20 p-4 space-y-2">
+                  <p className="text-sm font-medium text-foreground">Randevu akisi ({bookingPlan.totalMinutes} dk)</p>
+                  {bookingPlan.stages.map((stage) => (
+                    <div
+                      key={`${stage.id}-${stage.offsetMinutes}`}
+                      className="flex items-center justify-between text-xs"
                     >
-                      <div className="font-medium text-sm">{staff.name}</div>
-                      <div className="text-xs text-muted-foreground mt-1 truncate">
-                        {staff.specialties.slice(0, 2).join(", ")}
-                      </div>
-                    </button>
+                      <span
+                        className={stage.requiresStaff ? "text-foreground font-medium" : "text-muted-foreground"}
+                      >
+                        {stage.name}
+                        {stage.requiresStaff ? " · personel mesgul" : " · bekleme"}
+                      </span>
+                      <span className="text-muted-foreground">
+                        +{stage.offsetMinutes} dk · {stage.durationMinutes} dk
+                      </span>
+                    </div>
                   ))}
                 </div>
-              </div>
+              ) : null}
 
-              {/* Notlar */}
-              <div className="space-y-2">
-                <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-                  <FileText className="w-4 h-4" />
-                  Notlar
-                </h3>
-                <Textarea
-                  placeholder="Rezervasyon ile ilgili notlar..."
-                  value={reservationForm.notes}
-                  onChange={(e) => setReservationForm({ ...reservationForm, notes: e.target.value })}
-                  className="rounded-xl min-h-20 resize-none"
-                />
-              </div>
+              {modalStaff ? (
+                <div className="flex items-center gap-3 rounded-xl border bg-muted/30 px-4 py-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-foreground">{modalStaff.fullName}</p>
+                    <p className="text-xs text-muted-foreground">Secilen personel</p>
+                  </div>
+                  {!canStaffStartAt(reservationForm.staffId, selectedTime) ? (
+                    <Badge variant="destructive" className="ml-auto shrink-0">
+                      Mesgul
+                    </Badge>
+                  ) : (
+                    <Badge variant="secondary" className="ml-auto shrink-0">
+                      Musait
+                    </Badge>
+                  )}
+                </div>
+              ) : null}
 
-              {/* Kaydet Butonu */}
-              <div className="pt-4">
-                <Button
-                  className="w-full h-12 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-medium gap-2 shadow-lg shadow-emerald-600/25"
-                  onClick={handleCreateReservation}
-                >
-                  <CheckCircle className="w-4 h-4" />
-                  Rezervasyon Olustur
-                </Button>
-              </div>
+              <Textarea
+                placeholder="Notlar"
+                value={reservationForm.notes}
+                onChange={(e) => setReservationForm({ ...reservationForm, notes: e.target.value })}
+                className="rounded-xl min-h-20"
+              />
+
+              <Button
+                className="w-full h-12 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white"
+                onClick={() => void handleCreateReservation()}
+                disabled={!bookingPlan || !canStaffStartAt(reservationForm.staffId, selectedTime)}
+              >
+                <CheckCircle className="w-4 h-4 mr-2" />
+                Rezervasyon Olustur
+              </Button>
             </div>
           </div>
         </div>

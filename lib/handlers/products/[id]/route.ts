@@ -19,7 +19,7 @@ export async function PUT(
       return apiJson({ ok: false, message: "Gecersiz urun id." }, 400)
     }
 
-    const token = appConfig.token.Urünler
+    const token = appConfig.token.menu_items
     if (!token) {
       return apiJson({ ok: false, message: "Urunler token tanimli degil." }, 500)
     }
@@ -72,7 +72,7 @@ export async function DELETE(
       return apiJson({ ok: false, message: "Gecersiz urun id." }, 400)
     }
 
-    const token = appConfig.token.Urünler
+    const token = appConfig.token.menu_items
     if (!token) {
       return apiJson({ ok: false, message: "Urunler token tanimli degil." }, 500)
     }

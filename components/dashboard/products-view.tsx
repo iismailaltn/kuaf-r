@@ -25,6 +25,7 @@ import {
   Package,
   ShoppingBag,
   User,
+  Users,
   Minus,
   Plus,
   CheckCircle,
@@ -59,12 +60,63 @@ const statusColors: Record<string, string> = {
   "dusuk stok": "bg-amber-500/10 text-amber-600 border-amber-200",
 }
 
-interface ProductsViewProps {
-  businessUserId?: string
+interface StaffMember {
+  id: string
+  userId: string
+  name: string
+  specialties: string[]
 }
 
-export function ProductsView({ businessUserId }: ProductsViewProps) {
+interface PersonelApiRow {
+  id?: string | number
+  user_id?: string | number
+  userId?: string | number
+  individual_user_id?: string | number
+  individualUserId?: string | number
+  full_name?: string
+  first_name?: string
+  last_name?: string
+  expertise?: string
+  is_active?: boolean | number | string
+}
+
+function toStaffMember(row: PersonelApiRow, index: number): StaffMember | null {
+  const fullName = String(row.full_name ?? "").trim()
+  const firstName = String(row.first_name ?? "").trim()
+  const lastName = String(row.last_name ?? "").trim()
+  const name = fullName || `${firstName} ${lastName}`.trim()
+  if (!name) return null
+
+  const isActiveValue = row.is_active
+  const isActive =
+    isActiveValue === true ||
+    isActiveValue === 1 ||
+    isActiveValue === "1" ||
+    isActiveValue === "true"
+  if (!isActive) return null
+
+  const specialties = String(row.expertise ?? "")
+    .split("|")
+    .map((item) => item.trim())
+    .filter(Boolean)
+
+  return {
+    id: String(row.id ?? `EMP${String(index + 1).padStart(3, "0")}`),
+    userId: String(row.user_id ?? row.userId ?? row.individual_user_id ?? row.individualUserId ?? ""),
+    name,
+    specialties,
+  }
+}
+
+interface ProductsViewProps {
+  businessUserId?: string
+  currentUserId?: string
+  currentAccountType?: string
+}
+
+export function ProductsView({ businessUserId, currentUserId, currentAccountType }: ProductsViewProps) {
   const [products, setProducts] = useState<Product[]>([])
+  const [staffList, setStaffList] = useState<StaffMember[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
 
@@ -74,6 +126,7 @@ export function ProductsView({ businessUserId }: ProductsViewProps) {
   const [saleForm, setSaleForm] = useState({
     customerName: "",
     customerSurname: "",
+    staffId: "",
     quantity: 1,
   })
 
@@ -107,9 +160,28 @@ export function ProductsView({ businessUserId }: ProductsViewProps) {
     return true
   }, [businessUserId])
 
+  const loadStaff = useCallback(async () => {
+    if (!businessUserId) return
+    const res = await apiFetch(`/api/personels?businessUserId=${encodeURIComponent(businessUserId)}`, { cache: "no-store" })
+    const json = (await res.json().catch(() => null)) as { ok?: boolean; rows?: PersonelApiRow[] } | null
+    if (!res.ok || !json?.ok || !Array.isArray(json?.rows)) {
+      return
+    }
+
+    const mapped = json.rows
+      .map((row, index) => toStaffMember(row, index))
+      .filter((row): row is StaffMember => row !== null)
+    const visibleStaff =
+      currentAccountType === "bireysel" && currentUserId
+        ? mapped.filter((staff) => staff.userId === currentUserId)
+        : mapped
+    setStaffList(visibleStaff)
+  }, [businessUserId, currentAccountType, currentUserId])
+
   useEffect(() => {
     void loadProducts()
-  }, [loadProducts])
+    void loadStaff()
+  }, [loadProducts, loadStaff])
 
   const categoryCards = useMemo(() => {
     const counts = new Map<string, number>()
@@ -135,10 +207,14 @@ export function ProductsView({ businessUserId }: ProductsViewProps) {
       alert("Bu urun stokta yok!")
       return
     }
+    const selfStaff =
+      currentUserId && staffList.find((staff) => staff.userId === currentUserId)
+    const defaultStaff = selfStaff?.id ?? (staffList.length === 1 ? staffList[0].id : "")
     setSaleProduct(product)
     setSaleForm({
       customerName: "",
       customerSurname: "",
+      staffId: defaultStaff,
       quantity: 1,
     })
     setShowSaleModal(true)
@@ -151,6 +227,7 @@ export function ProductsView({ businessUserId }: ProductsViewProps) {
     setSaleForm({
       customerName: "",
       customerSurname: "",
+      staffId: "",
       quantity: 1,
     })
   }
@@ -164,6 +241,18 @@ export function ProductsView({ businessUserId }: ProductsViewProps) {
     }
     if (saleForm.quantity <= 0 || saleForm.quantity > saleProduct.stock) {
       alert("Gecersiz adet secimi.")
+      return
+    }
+    if (!saleForm.staffId) {
+      alert("Lutfen satisi yapan personeli secin.")
+      return
+    }
+
+    const selectedStaff = staffList.find((staff) => staff.id === saleForm.staffId)
+    const userId = (selectedStaff?.userId || currentUserId || "").trim()
+    const staffName = (selectedStaff?.name ?? "").trim()
+    if (!userId || !staffName) {
+      alert("Personel secimi gecersiz. Lutfen listeden personel secin.")
       return
     }
 
@@ -187,7 +276,6 @@ export function ProductsView({ businessUserId }: ProductsViewProps) {
 
     const json = (await res.json().catch(() => null)) as any
     if (!res.ok || !json?.ok) {
-      // API basarisiz olsa bile local olarak guncelle
       setProducts((prev) =>
         prev.map((p) =>
           p.id === saleProduct.id
@@ -201,6 +289,27 @@ export function ProductsView({ businessUserId }: ProductsViewProps) {
       )
     } else {
       await loadProducts()
+    }
+
+    const saleRes = await apiFetch("/api/product-sales", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        businessUserId,
+        productId: saleProduct.id,
+        productName: saleProduct.name,
+        category: saleProduct.category,
+        customerName: saleForm.customerName.trim(),
+        customerSurname: saleForm.customerSurname.trim(),
+        user_id: userId,
+        staff_name: staffName,
+        quantity: saleForm.quantity,
+        unitPrice: Number(saleProduct.price),
+      }),
+    })
+    const saleJson = (await saleRes.json().catch(() => null)) as { ok?: boolean; message?: string } | null
+    if (!saleRes.ok || !saleJson?.ok) {
+      alert(saleJson?.message ?? "Satis kaydi olusturulamadi. Stok guncellendi.")
     }
 
     closeSaleModal()
@@ -299,6 +408,40 @@ export function ProductsView({ businessUserId }: ProductsViewProps) {
                     />
                   </div>
                 </div>
+              </div>
+
+              {/* Staff Selection */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                  <Users className="w-4 h-4" />
+                  Satisi Yapan Personel *
+                </h3>
+                {staffList.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Aktif personel bulunamadı.</p>
+                ) : (
+                  <div className="grid grid-cols-2 gap-3">
+                    {staffList.map((staff) => (
+                      <button
+                        key={staff.id}
+                        type="button"
+                        onClick={() => setSaleForm({ ...saleForm, staffId: staff.id })}
+                        className={cn(
+                          "p-3 rounded-xl text-left transition-all border-2",
+                          saleForm.staffId === staff.id
+                            ? "bg-emerald-50 border-emerald-500 text-emerald-700"
+                            : "bg-muted/50 border-transparent hover:border-muted-foreground/20"
+                        )}
+                      >
+                        <div className="font-medium text-sm">{staff.name}</div>
+                        {staff.specialties.length > 0 && (
+                          <div className="text-xs text-muted-foreground mt-1 truncate">
+                            {staff.specialties.slice(0, 2).join(", ")}
+                          </div>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Quantity Selection */}

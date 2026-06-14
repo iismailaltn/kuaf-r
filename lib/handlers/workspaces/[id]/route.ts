@@ -1,12 +1,10 @@
 import { appConfig } from "@/app.config"
 import { sqlToken } from "@/lib/services/locofabric-database"
 import type { AxiosError } from "axios"
-import { getBusinessUserIdFromBody, requireBusinessUserId } from "@/lib/business-scope"
+import { getBusinessUserIdFromBody, requireBusinessUserId, sqlBusinessUserIdRef } from "@/lib/business-scope"
 import { apiJson } from "@/lib/api-response"
-
-function sanitizeSqlString(input: string) {
-  return input.replace(/'/g, "''")
-}
+import { encodeWorkspaceSessionPayload } from "@/lib/session-payload"
+import { sanitizeSqlString } from "@/lib/sql-sanitize"
 
 export async function PUT(
   req: Request,
@@ -39,7 +37,8 @@ export async function PUT(
       return apiJson({ ok: false, message: "kuafor_tables token tanimli degil." }, 500)
     }
 
-    const sql = `UPDATE restaurant_tables SET tableNumber='${tableNumber}', updatedAt=CURRENT_TIMESTAMP WHERE id=${idNum} AND business_user_id=${businessUserId}`
+    const businessUserIdRef = sqlBusinessUserIdRef(businessUserId)
+    const sql = `UPDATE restaurant_tables SET tableNumber='${tableNumber}', updatedAt=CURRENT_TIMESTAMP WHERE id=${idNum} AND business_user_id=${businessUserIdRef}`
     await sqlToken(token, sql)
 
     return apiJson({ ok: true })
@@ -67,7 +66,20 @@ export async function PATCH(
     if (!Number.isFinite(idNum)) {
       return apiJson({ ok: false, message: "Gecersiz calisma alani id." }, 400)
     }
-    const body = (await req.json().catch(() => null)) as { businessUserId?: string | number; status?: string; previousTableNumber?: string } | null
+    const body = (await req.json().catch(() => null)) as {
+      businessUserId?: string | number
+      status?: string
+      previousTableNumber?: string
+      sessionData?: {
+        customerName?: string
+        customerSurname?: string
+        services?: string[]
+        staffId?: string
+        staffName?: string
+        notes?: string
+        startTime?: number
+      } | null
+    } | null
     const businessUserId = getBusinessUserIdFromBody(body)
     const businessError = requireBusinessUserId(businessUserId)
     if (businessError) {
@@ -87,7 +99,18 @@ export async function PATCH(
       return apiJson({ ok: false, message: "kuafor_tables token tanimli degil." }, 500)
     }
 
-    const sql = `UPDATE restaurant_tables SET status='${statusValue}', updatedAt=CURRENT_TIMESTAMP WHERE id=${idNum} AND business_user_id=${businessUserId}`
+    const sessionFields: string[] = [`status='${statusValue}'`]
+    if (body && "sessionData" in body) {
+      const sessionData = body.sessionData
+      if (sessionData && typeof sessionData === "object") {
+        sessionFields.push(`locationDescription=${encodeWorkspaceSessionPayload(sessionData)}`)
+      } else {
+        sessionFields.push("locationDescription=''")
+      }
+    }
+
+    const businessUserIdRef = sqlBusinessUserIdRef(businessUserId)
+    const sql = `UPDATE restaurant_tables SET ${sessionFields.join(", ")}, updatedAt=CURRENT_TIMESTAMP WHERE id=${idNum} AND business_user_id=${businessUserIdRef}`
     await sqlToken(token, sql)
 
     return apiJson({ ok: true })
@@ -131,7 +154,7 @@ export async function DELETE(
       return apiJson({ ok: false, message: "kuafor_tables token tanimli degil." }, 500)
     }
 
-    const sql = `DELETE FROM restaurant_tables WHERE id=${idNum} AND business_user_id=${businessUserId}`
+    const sql = `DELETE FROM restaurant_tables WHERE id=${idNum} AND business_user_id=${sqlBusinessUserIdRef(businessUserId)}`
     await sqlToken(token, sql)
 
     return apiJson({ ok: true })

@@ -1,0 +1,1 @@
+export const INSTAGRAM_GRAPH_VERSION = "v25.0"

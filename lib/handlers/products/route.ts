@@ -16,7 +16,7 @@ export async function GET(req: Request) {
       return apiJson({ ok: false, message: businessError }, 400)
     }
 
-    const token = appConfig.token.Urünler
+    const token = appConfig.token.menu_items
     if (!token) {
       return apiJson({ ok: false, message: "Urunler token tanimli degil." }, 500)
     }
@@ -45,7 +45,7 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const token = appConfig.token.Urünler
+    const token = appConfig.token.menu_items
     if (!token) {
       return apiJson({ ok: false, message: "Urunler token tanimli degil." }, 500)
     }

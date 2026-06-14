@@ -135,9 +135,21 @@ export async function POST(req: Request) {
       businessUserId = String(getField(acceptedInvitation, ["business_user_id", "businessUserId"]) ?? "").trim()
     }
 
+    let shopName = ""
+    const profileUserId = accountType === "kurumsal" ? userId : businessUserId
+    if (profileUserId && appConfig.token.corporate_profiles) {
+      const corporateData = await selectByToken<any>(appConfig.token.corporate_profiles)
+      const corporateProfiles = extractRows(corporateData)
+      const profile = corporateProfiles.find((profileRow) => {
+        const profileUserIdValue = String(getField(profileRow, ["user_id", "userId"]) ?? "").trim()
+        return profileUserIdValue === profileUserId
+      })
+      shopName = String(getField(profile, ["business_name", "businessName"]) ?? "").trim()
+    }
+
     return apiJson({
       ok: true,
-      user: { ...row, staffAccepted, businessUserId },
+      user: { ...row, staffAccepted, businessUserId, shopName },
     })
   } catch (err) {
     const axiosErr = err as AxiosError | undefined
