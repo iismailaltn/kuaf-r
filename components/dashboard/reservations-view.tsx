@@ -27,7 +27,19 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
-import { ChevronLeft, ChevronRight, X, Calendar, CheckCircle, Phone } from "lucide-react"
+import {
+  ChevronLeft,
+  ChevronRight,
+  X,
+  Calendar,
+  CheckCircle,
+  Phone,
+  Clock,
+  Scissors,
+  Wallet,
+  User,
+  Check,
+} from "lucide-react"
 import {
   formatTurkishPhoneSuffix,
   parseTurkishPhoneInput,
@@ -68,6 +80,7 @@ export function ReservationsView({ businessUserId }: ReservationsViewProps) {
   const [showDayPanel, setShowDayPanel] = useState(false)
   const [showReservationModal, setShowReservationModal] = useState(false)
   const [selectedTime, setSelectedTime] = useState<string | null>(null)
+  const [wizardStep, setWizardStep] = useState(1)
 
   const [reservationForm, setReservationForm] = useState({
     customerName: "",
@@ -205,6 +218,7 @@ export function ReservationsView({ businessUserId }: ReservationsViewProps) {
 
   const openReservationModal = (staffId: string, time: string) => {
     setSelectedTime(time)
+    setWizardStep(1)
     setReservationForm({
       customerName: "",
       customerSurname: "",
@@ -316,6 +330,29 @@ export function ReservationsView({ businessUserId }: ReservationsViewProps) {
   const modalStaff = staffList.find((s) => s.id === reservationForm.staffId)
   const scheduleBookings = scheduleStaff ? getStaffReservations(scheduleStaff.id) : []
   const scheduleVisibleSlots = scheduleStaff ? getVisibleSlotsForStaff(scheduleStaff.id) : []
+
+  const selectedServices = activeServices.filter((s) => reservationForm.serviceIds.includes(s.id))
+  const totalPrice = selectedServices.reduce((sum, s) => sum + (Number(s.price) || 0), 0)
+  const endTimeLabel =
+    selectedTime && bookingPlan
+      ? formatMinutesToTime(parseTimeToMinutes(selectedTime) + bookingPlan.totalMinutes)
+      : null
+  const staffAvailable = selectedTime ? canStaffStartAt(reservationForm.staffId, selectedTime) : false
+
+  const step1Valid =
+    reservationForm.customerName.trim().length > 0 &&
+    reservationForm.customerSurname.trim().length > 0 &&
+    reservationForm.phone.trim().length > 0
+  const step2Valid = reservationForm.serviceIds.length > 0 && Boolean(bookingPlan)
+
+  const wizardSteps = [
+    { id: 1, label: "Musteri" },
+    { id: 2, label: "Hizmet" },
+    { id: 3, label: "Onay" },
+  ]
+
+  const formatPrice = (value: number) =>
+    new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(value)
 
   return (
     <div className="p-6 space-y-6">
@@ -460,138 +497,336 @@ export function ReservationsView({ businessUserId }: ReservationsViewProps) {
 
       {showReservationModal && selectedDate && selectedTime && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-card rounded-3xl shadow-2xl">
-            <div className="sticky top-0 z-10 bg-gradient-to-br from-emerald-600 to-teal-600 px-6 py-5">
-              <button
-                type="button"
-                onClick={closeReservationModal}
-                className="absolute top-4 right-4 p-1.5 rounded-full bg-white/20"
-              >
-                <X className="w-4 h-4 text-white" />
-              </button>
-              <h2 className="text-lg font-semibold text-white">Yeni Rezervasyon</h2>
-              <p className="text-sm text-white/80">
-                {formatSelectedDate()} · {modalStaff?.fullName ?? "Personel"} · {selectedTime}
-                {bookingPlan
-                  ? ` → ${formatMinutesToTime(parseTimeToMinutes(selectedTime) + bookingPlan.totalMinutes)}`
-                  : ""}
-              </p>
-            </div>
-
-            <div className="p-6 space-y-6">
-              <div className="grid grid-cols-2 gap-4">
-                <Input
-                  placeholder="Ad *"
-                  value={reservationForm.customerName}
-                  onChange={(e) => setReservationForm({ ...reservationForm, customerName: e.target.value })}
-                  className="rounded-xl"
-                />
-                <Input
-                  placeholder="Soyad *"
-                  value={reservationForm.customerSurname}
-                  onChange={(e) => setReservationForm({ ...reservationForm, customerSurname: e.target.value })}
-                  className="rounded-xl"
-                />
-              </div>
-              <div className="space-y-2">
-                <h3 className="text-sm font-medium text-muted-foreground">Telefon *</h3>
-                <div
-                  className={cn(
-                    "flex items-center h-12 w-full rounded-xl border border-border bg-muted/50",
-                    "focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background"
-                  )}
-                >
-                  <Phone className="ml-3 w-5 h-5 shrink-0 text-muted-foreground" />
-                  <span className="pl-2 text-foreground tabular-nums select-none">0</span>
-                  <input
-                    type="tel"
-                    inputMode="numeric"
-                    placeholder="(5xx) xxx xx xx"
-                    value={formatTurkishPhoneSuffix(reservationForm.phone)}
-                    onChange={handlePhoneChange}
-                    className="flex-1 min-w-0 h-full bg-transparent px-1 text-foreground outline-none placeholder:text-muted-foreground"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <h3 className="text-sm font-medium text-muted-foreground">Hizmetler *</h3>
-                <div className="flex flex-wrap gap-2">
-                  {activeServices.map((service) => (
-                    <button
-                      key={service.id}
-                      type="button"
-                      onClick={() => toggleService(service.id)}
-                      className={cn(
-                        "px-4 py-2 rounded-xl text-sm font-medium transition-all",
-                        reservationForm.serviceIds.includes(service.id)
-                          ? "bg-emerald-600 text-white"
-                          : "bg-muted text-muted-foreground",
-                      )}
-                    >
-                      {service.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {bookingPlan ? (
-                <div className="rounded-xl border border-border/60 bg-muted/20 p-4 space-y-2">
-                  <p className="text-sm font-medium text-foreground">Randevu akisi ({bookingPlan.totalMinutes} dk)</p>
-                  {bookingPlan.stages.map((stage) => (
-                    <div
-                      key={`${stage.id}-${stage.offsetMinutes}`}
-                      className="flex items-center justify-between text-xs"
-                    >
-                      <span
-                        className={stage.requiresStaff ? "text-foreground font-medium" : "text-muted-foreground"}
-                      >
-                        {stage.name}
-                        {stage.requiresStaff ? " · personel mesgul" : " · bekleme"}
-                      </span>
-                      <span className="text-muted-foreground">
-                        +{stage.offsetMinutes} dk · {stage.durationMinutes} dk
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              ) : null}
-
-              {modalStaff ? (
-                <div className="flex items-center gap-3 rounded-xl border bg-muted/30 px-4 py-3">
+          <div className="w-full max-w-3xl max-h-[92vh] overflow-hidden bg-card rounded-3xl shadow-2xl flex flex-col md:flex-row">
+            {/* Sol: sihirbaz */}
+            <div className="flex flex-col min-h-0 flex-1">
+              <div className="px-6 pt-6 pb-4 border-b border-border/60">
+                <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-foreground">{modalStaff.fullName}</p>
-                    <p className="text-xs text-muted-foreground">Secilen personel</p>
+                    <h2 className="text-lg font-semibold text-foreground">Yeni Rezervasyon</h2>
+                    <p className="text-sm text-muted-foreground truncate">{formatSelectedDate()}</p>
                   </div>
-                  {!canStaffStartAt(reservationForm.staffId, selectedTime) ? (
-                    <Badge variant="destructive" className="ml-auto shrink-0">
-                      Mesgul
-                    </Badge>
-                  ) : (
-                    <Badge variant="secondary" className="ml-auto shrink-0">
-                      Musait
-                    </Badge>
-                  )}
+                  <button
+                    type="button"
+                    onClick={closeReservationModal}
+                    className="shrink-0 p-1.5 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                    aria-label="Kapat"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
                 </div>
-              ) : null}
 
-              <Textarea
-                placeholder="Notlar"
-                value={reservationForm.notes}
-                onChange={(e) => setReservationForm({ ...reservationForm, notes: e.target.value })}
-                className="rounded-xl min-h-20"
-              />
+                {/* Adim gostergesi */}
+                <div className="flex items-center mt-5">
+                  {wizardSteps.map((step, index) => {
+                    const isActive = wizardStep === step.id
+                    const isDone = wizardStep > step.id
+                    return (
+                      <div key={step.id} className="flex items-center flex-1 last:flex-none">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={cn(
+                              "flex items-center justify-center w-8 h-8 rounded-full text-xs font-semibold transition-colors shrink-0",
+                              isActive && "bg-emerald-600 text-white",
+                              isDone && "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400",
+                              !isActive && !isDone && "bg-muted text-muted-foreground",
+                            )}
+                          >
+                            {isDone ? <Check className="w-4 h-4" /> : step.id}
+                          </span>
+                          <span
+                            className={cn(
+                              "text-xs font-medium hidden sm:block",
+                              isActive ? "text-foreground" : "text-muted-foreground",
+                            )}
+                          >
+                            {step.label}
+                          </span>
+                        </div>
+                        {index < wizardSteps.length - 1 && (
+                          <div
+                            className={cn(
+                              "h-px flex-1 mx-3 transition-colors",
+                              wizardStep > step.id ? "bg-emerald-500" : "bg-border",
+                            )}
+                          />
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
 
-              <Button
-                className="w-full h-12 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white"
-                onClick={() => void handleCreateReservation()}
-                disabled={!bookingPlan || !canStaffStartAt(reservationForm.staffId, selectedTime)}
-              >
-                <CheckCircle className="w-4 h-4 mr-2" />
-                Rezervasyon Olustur
-              </Button>
+              {/* Adim icerigi */}
+              <div className="flex-1 overflow-y-auto p-6 space-y-5">
+                {wizardStep === 1 && (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-medium text-muted-foreground">Ad *</label>
+                        <Input
+                          placeholder="Ad"
+                          value={reservationForm.customerName}
+                          onChange={(e) => setReservationForm({ ...reservationForm, customerName: e.target.value })}
+                          className="rounded-xl"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-medium text-muted-foreground">Soyad *</label>
+                        <Input
+                          placeholder="Soyad"
+                          value={reservationForm.customerSurname}
+                          onChange={(e) =>
+                            setReservationForm({ ...reservationForm, customerSurname: e.target.value })
+                          }
+                          className="rounded-xl"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-muted-foreground">Telefon *</label>
+                      <div
+                        className={cn(
+                          "flex items-center h-12 w-full rounded-xl border border-border bg-muted/50",
+                          "focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background",
+                        )}
+                      >
+                        <Phone className="ml-3 w-5 h-5 shrink-0 text-muted-foreground" />
+                        <span className="pl-2 text-foreground tabular-nums select-none">0</span>
+                        <input
+                          type="tel"
+                          inputMode="numeric"
+                          placeholder="(5xx) xxx xx xx"
+                          value={formatTurkishPhoneSuffix(reservationForm.phone)}
+                          onChange={handlePhoneChange}
+                          className="flex-1 min-w-0 h-full bg-transparent px-1 text-foreground outline-none placeholder:text-muted-foreground"
+                          required
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {wizardStep === 2 && (
+                  <div className="space-y-4">
+                    <p className="text-xs font-medium text-muted-foreground">
+                      Bir veya birden fazla hizmet secin
+                    </p>
+                    <div className="grid sm:grid-cols-2 gap-2">
+                      {activeServices.map((service) => {
+                        const selected = reservationForm.serviceIds.includes(service.id)
+                        return (
+                          <button
+                            key={service.id}
+                            type="button"
+                            onClick={() => toggleService(service.id)}
+                            className={cn(
+                              "flex items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition-all",
+                              selected
+                                ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-500/10"
+                                : "border-border bg-card hover:bg-muted/50",
+                            )}
+                          >
+                            <span className="min-w-0">
+                              <span className="block text-sm font-medium text-foreground truncate">
+                                {service.name}
+                              </span>
+                              {Number(service.price) > 0 && (
+                                <span className="block text-xs text-muted-foreground">
+                                  ₺{formatPrice(Number(service.price))}
+                                </span>
+                              )}
+                            </span>
+                            <span
+                              className={cn(
+                                "flex items-center justify-center w-5 h-5 rounded-full border shrink-0 transition-colors",
+                                selected
+                                  ? "bg-emerald-600 border-emerald-600 text-white"
+                                  : "border-border text-transparent",
+                              )}
+                            >
+                              <Check className="w-3 h-3" />
+                            </span>
+                          </button>
+                        )
+                      })}
+                    </div>
+
+                    {bookingPlan ? (
+                      <div className="rounded-xl border border-border/60 bg-muted/20 p-4 space-y-2">
+                        <p className="text-sm font-medium text-foreground">
+                          Randevu akisi ({bookingPlan.totalMinutes} dk)
+                        </p>
+                        {bookingPlan.stages.map((stage) => (
+                          <div
+                            key={`${stage.id}-${stage.offsetMinutes}`}
+                            className="flex items-center justify-between text-xs"
+                          >
+                            <span
+                              className={
+                                stage.requiresStaff ? "text-foreground font-medium" : "text-muted-foreground"
+                              }
+                            >
+                              {stage.name}
+                              {stage.requiresStaff ? " · personel mesgul" : " · bekleme"}
+                            </span>
+                            <span className="text-muted-foreground">
+                              +{stage.offsetMinutes} dk · {stage.durationMinutes} dk
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                )}
+
+                {wizardStep === 3 && (
+                  <div className="space-y-4">
+                    {modalStaff ? (
+                      <div className="flex items-center gap-3 rounded-xl border bg-muted/30 px-4 py-3">
+                        <div className="flex items-center justify-center w-9 h-9 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400 shrink-0">
+                          <User className="w-4 h-4" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-foreground truncate">{modalStaff.fullName}</p>
+                          <p className="text-xs text-muted-foreground">Secilen personel</p>
+                        </div>
+                        {staffAvailable ? (
+                          <Badge variant="secondary" className="ml-auto shrink-0">
+                            Musait
+                          </Badge>
+                        ) : (
+                          <Badge variant="destructive" className="ml-auto shrink-0">
+                            Mesgul
+                          </Badge>
+                        )}
+                      </div>
+                    ) : null}
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-muted-foreground">Notlar</label>
+                      <Textarea
+                        placeholder="Randevu ile ilgili notlar (istege bagli)"
+                        value={reservationForm.notes}
+                        onChange={(e) => setReservationForm({ ...reservationForm, notes: e.target.value })}
+                        className="rounded-xl min-h-24"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Adim navigasyonu */}
+              <div className="px-6 py-4 border-t border-border/60 flex items-center justify-between gap-3">
+                {wizardStep > 1 ? (
+                  <Button
+                    variant="outline"
+                    className="rounded-xl"
+                    onClick={() => setWizardStep((s) => Math.max(1, s - 1))}
+                  >
+                    <ChevronLeft className="w-4 h-4 mr-1" />
+                    Geri
+                  </Button>
+                ) : (
+                  <span />
+                )}
+
+                {wizardStep < 3 ? (
+                  <Button
+                    className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white"
+                    onClick={() => setWizardStep((s) => Math.min(3, s + 1))}
+                    disabled={wizardStep === 1 ? !step1Valid : !step2Valid}
+                  >
+                    Devam
+                    <ChevronRight className="w-4 h-4 ml-1" />
+                  </Button>
+                ) : (
+                  <Button
+                    className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white"
+                    onClick={() => void handleCreateReservation()}
+                    disabled={!bookingPlan || !staffAvailable}
+                  >
+                    <CheckCircle className="w-4 h-4 mr-2" />
+                    Rezervasyon Olustur
+                  </Button>
+                )}
+              </div>
             </div>
+
+            {/* Sag: canli ozet */}
+            <aside className="md:w-72 shrink-0 border-t md:border-t-0 md:border-l border-border/60 bg-muted/30 p-6 space-y-4 overflow-y-auto">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Randevu Ozeti</p>
+
+              <div className="space-y-3">
+                <div className="flex items-start gap-3">
+                  <Calendar className="w-4 h-4 mt-0.5 text-muted-foreground shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-xs text-muted-foreground">Tarih</p>
+                    <p className="text-sm font-medium text-foreground">{formatSelectedDate()}</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Clock className="w-4 h-4 mt-0.5 text-muted-foreground shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-xs text-muted-foreground">Saat</p>
+                    <p className="text-sm font-medium text-foreground">
+                      {selectedTime}
+                      {endTimeLabel ? ` → ${endTimeLabel}` : ""}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <User className="w-4 h-4 mt-0.5 text-muted-foreground shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-xs text-muted-foreground">Personel</p>
+                    <p className="text-sm font-medium text-foreground truncate">
+                      {modalStaff?.fullName ?? "—"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t border-border/60 pt-4 space-y-2">
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Scissors className="w-3.5 h-3.5" />
+                  Hizmetler
+                </div>
+                {selectedServices.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Henuz hizmet secilmedi</p>
+                ) : (
+                  <ul className="space-y-1.5">
+                    {selectedServices.map((service) => (
+                      <li key={service.id} className="flex items-center justify-between gap-2 text-sm">
+                        <span className="text-foreground truncate">{service.name}</span>
+                        {Number(service.price) > 0 && (
+                          <span className="text-muted-foreground shrink-0">
+                            ₺{formatPrice(Number(service.price))}
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              <div className="border-t border-border/60 pt-4 space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Toplam sure</span>
+                  <span className="font-medium text-foreground">
+                    {bookingPlan ? `${bookingPlan.totalMinutes} dk` : "—"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                    <Wallet className="w-3.5 h-3.5" />
+                    Toplam ucret
+                  </span>
+                  <span className="text-base font-semibold text-foreground">
+                    {totalPrice > 0 ? `₺${formatPrice(totalPrice)}` : "—"}
+                  </span>
+                </div>
+              </div>
+            </aside>
           </div>
         </div>
       )}
