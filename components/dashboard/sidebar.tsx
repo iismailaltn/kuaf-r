@@ -18,7 +18,9 @@ import {
   ClipboardList,
   ShoppingBag,
   Contact,
+  MonitorPlay,
 } from "lucide-react"
+import { useRouter } from "next/navigation"
 import { useEffect, useState, type ReactNode } from "react"
 import {
   DropdownMenu,
@@ -249,8 +251,10 @@ function renderNavList(
 }
 
 export function Sidebar({ activeView, onViewChange, onLogout, shopName = "Kuaför", role = "user", hideNavigation = false }: SidebarProps) {
+  const router = useRouter()
   const [collapsed, setCollapsed] = useState(false)
   const navItems = navItemsByRole[role] ?? navItemsByRole.user
+  const canViewPresentation = role === "admin" || role === "supervisor"
   const adminSectionIds: ViewType[] = ["users", "reservations", "performance", "inventory"]
   const mainNavItems = role === "admin" ? navItems.filter((item) => !adminSectionIds.includes(item.id)) : navItems
   const adminNavItems = role === "admin" ? navItems.filter((item) => adminSectionIds.includes(item.id)) : []
@@ -307,6 +311,28 @@ export function Sidebar({ activeView, onViewChange, onLogout, shopName = "Kuafö
               </div>
             )}
             {renderNavList(adminNavItems, activeView, collapsed, onViewChange, operationsInsertId)}
+
+            {canViewPresentation && (
+              <>
+                {!collapsed && (
+                  <div className="px-3 pt-3 pb-1 text-xs font-semibold tracking-wide text-muted-foreground/80">
+                    Tanıtım
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => router.push("/presentation")}
+                  className={cn(
+                    "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground transition-all",
+                    collapsed && "justify-center"
+                  )}
+                  title="Sunum sayfası"
+                >
+                  <MonitorPlay className="w-5 h-5 shrink-0" />
+                  {!collapsed && <span className="text-sm font-medium">Sunum</span>}
+                </button>
+              </>
+            )}
           </>
         )}
       </nav>
