@@ -20,7 +20,7 @@ import {
   Contact,
   MonitorPlay,
 } from "lucide-react"
-import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { useEffect, useState, type ReactNode } from "react"
 import {
   DropdownMenu,
@@ -251,7 +251,6 @@ function renderNavList(
 }
 
 export function Sidebar({ activeView, onViewChange, onLogout, shopName = "Kuaför", role = "user", hideNavigation = false }: SidebarProps) {
-  const router = useRouter()
   const [collapsed, setCollapsed] = useState(false)
   const navItems = navItemsByRole[role] ?? navItemsByRole.user
   const canViewPresentation = role === "admin" || role === "supervisor"
@@ -319,9 +318,8 @@ export function Sidebar({ activeView, onViewChange, onLogout, shopName = "Kuafö
                     Tanıtım
                   </div>
                 )}
-                <button
-                  type="button"
-                  onClick={() => router.push("/presentation")}
+                <Link
+                  href="/presentation"
                   className={cn(
                     "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground transition-all",
                     collapsed && "justify-center"
@@ -330,7 +328,7 @@ export function Sidebar({ activeView, onViewChange, onLogout, shopName = "Kuafö
                 >
                   <MonitorPlay className="w-5 h-5 shrink-0" />
                   {!collapsed && <span className="text-sm font-medium">Sunum</span>}
-                </button>
+                </Link>
               </>
             )}
           </>
