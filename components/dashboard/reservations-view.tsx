@@ -354,6 +354,36 @@ export function ReservationsView({ businessUserId }: ReservationsViewProps) {
   const formatPrice = (value: number) =>
     new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(value)
 
+  const dayReservations = useMemo(
+    () => [...selectedDateReservations].sort((a, b) => a.startTime.localeCompare(b.startTime)),
+    [selectedDateReservations],
+  )
+
+  const statusMeta: Record<string, { label: string; className: string }> = {
+    pending: {
+      label: "Bekliyor",
+      className: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+    },
+    confirmed: {
+      label: "Onaylandi",
+      className: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+    },
+    completed: {
+      label: "Tamamlandi",
+      className: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
+    },
+    cancelled: {
+      label: "Iptal",
+      className: "bg-destructive/10 text-destructive",
+    },
+  }
+
+  const sourceLabels: Record<string, string> = {
+    website: "Web sitesi",
+    manual: "Manuel",
+    whatsapp: "WhatsApp",
+  }
+
   return (
     <div className="p-6 space-y-6">
       <div>
@@ -460,17 +490,95 @@ export function ReservationsView({ businessUserId }: ReservationsViewProps) {
             </Button>
           </CardHeader>
 
-          <CardContent className="p-4 sm:p-6">
-            {staffList.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-8">Personel bulunamadi.</p>
-            ) : (
-              <StaffPickerGrid
-                staffList={staffList}
-                getBookings={getStaffReservations}
-                getVisibleSlots={getVisibleSlotsForStaff}
-                onSelectStaff={handleSelectStaff}
-              />
-            )}
+          <CardContent className="p-4 sm:p-6 space-y-6">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-foreground">Bu günün randevuları</h3>
+                <Badge variant="secondary" className="rounded-full">
+                  {dayReservations.length}
+                </Badge>
+              </div>
+
+              {dayReservations.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center">
+                  <Calendar className="w-8 h-8 text-muted-foreground mx-auto mb-2 opacity-60" />
+                  <p className="text-sm text-muted-foreground">Bu gün için henüz randevu yok</p>
+                </div>
+              ) : (
+                <ul className="space-y-2">
+                  {dayReservations.map((r) => {
+                    const meta = statusMeta[r.status] ?? statusMeta.pending
+                    return (
+                      <li
+                        key={r.id}
+                        className="flex items-start gap-3 rounded-xl border border-border bg-card px-4 py-3"
+                      >
+                        <div className="flex flex-col items-center justify-center rounded-lg bg-muted px-3 py-2 shrink-0">
+                          <span className="text-sm font-semibold text-foreground tabular-nums">
+                            {r.startTime}
+                          </span>
+                          <span className="text-[11px] text-muted-foreground tabular-nums">
+                            {r.endTime}
+                          </span>
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-medium text-foreground truncate">
+                              {r.customerName} {r.customerSurname}
+                            </p>
+                            <Badge className={cn("rounded-full border-0", meta.className)}>
+                              {meta.label}
+                            </Badge>
+                          </div>
+                          {r.serviceNames.length > 0 && (
+                            <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                              <Scissors className="inline w-3 h-3 mr-1 -mt-0.5" />
+                              {r.serviceNames.join(", ")}
+                            </p>
+                          )}
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1 text-xs text-muted-foreground">
+                            <span className="inline-flex items-center gap-1">
+                              <User className="w-3 h-3" />
+                              {r.staffName}
+                            </span>
+                            {r.phone && (
+                              <span className="inline-flex items-center gap-1">
+                                <Phone className="w-3 h-3" />
+                                {r.phone}
+                              </span>
+                            )}
+                            <span className="inline-flex items-center gap-1">
+                              <Clock className="w-3 h-3" />
+                              {r.totalMinutes} dk
+                            </span>
+                            {sourceLabels[r.source] && (
+                              <span className="text-muted-foreground/80">
+                                {sourceLabels[r.source]}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+            </div>
+
+            <div className="space-y-3 border-t border-border pt-6">
+              <h3 className="text-sm font-semibold text-foreground">Yeni randevu ekle</h3>
+              {staffList.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-8">Personel bulunamadi.</p>
+              ) : (
+                <StaffPickerGrid
+                  staffList={staffList}
+                  getBookings={getStaffReservations}
+                  getVisibleSlots={getVisibleSlotsForStaff}
+                  onSelectStaff={handleSelectStaff}
+                />
+              )}
+            </div>
           </CardContent>
         </Card>
       ) : (
