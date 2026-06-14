@@ -17,6 +17,8 @@ import {
   TrendingUp,
   UserPlus,
   Users,
+  Heart,
+  History,
 } from "lucide-react"
 
 interface PresentationSection {
@@ -151,6 +153,19 @@ const services = [
   },
 ]
 
+const customerHighlights = [
+  {
+    icon: <Heart className="h-6 w-6" />,
+    title: "Sadakat Takibi",
+    description: "Düzenli müşterilerinizi tanıyın, tercihlerini hatırlayın ve bağlılığı güçlendirin.",
+  },
+  {
+    icon: <History className="h-6 w-6" />,
+    title: "Randevu Geçmişi",
+    description: "Her müşterinin geçmiş seanslarına ve notlarına tek tıkla ulaşın.",
+  },
+]
+
 export default function PresentationPage() {
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -264,13 +279,81 @@ export default function PresentationPage() {
 
       {/* Feature sections */}
       <div className="mx-auto max-w-[1400px] px-3 sm:px-5">
-        {sections.map((section) => (
-          <section
-            key={section.id}
-            id={section.id}
-            className="scroll-mt-28 border-t border-border/60 py-16 md:py-24"
-          >
-            <div className="grid items-center gap-10 md:grid-cols-2 md:gap-14 lg:gap-20">
+        {sections.map((section) => {
+          if (section.id === "customers") {
+            return (
+              <section
+                key={section.id}
+                id={section.id}
+                className="scroll-mt-28 border-t border-border/60 py-16 md:py-24"
+              >
+                <div className="grid items-center gap-10 md:grid-cols-2 md:gap-14 lg:gap-20">
+                  {/* Arched media */}
+                  <div className="md:order-1">
+                    <div className="relative mx-auto max-w-md">
+                      <div className="absolute inset-0 -z-10 translate-x-4 translate-y-4 rounded-[10rem_10rem_2rem_2rem] bg-primary/15" />
+                      <div className="overflow-hidden rounded-[10rem_10rem_2rem_2rem] border border-border bg-card shadow-xl shadow-primary/10">
+                        <Image
+                          src={section.image || "/placeholder.svg"}
+                          alt={`${section.eyebrow} ekran görüntüsü`}
+                          width={900}
+                          height={1100}
+                          className="h-full w-full object-cover"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Text */}
+                  <div className="md:order-2">
+                    <div className="mb-5 inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary">
+                      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/15">
+                        {section.icon}
+                      </span>
+                      {section.eyebrow}
+                    </div>
+                    <h2 className="text-balance text-3xl font-bold leading-tight tracking-tight md:text-4xl">
+                      Müşterilerinizi{" "}
+                      <span className="rounded-lg bg-primary px-2 text-primary-foreground">tanıyın</span>,
+                      sadakatlerini kazanın
+                    </h2>
+                    <p className="mt-4 text-pretty text-lg leading-relaxed text-muted-foreground">
+                      {section.description}
+                    </p>
+
+                    <div className="mt-8 grid gap-6 sm:grid-cols-2">
+                      {customerHighlights.map((item) => (
+                        <div key={item.title}>
+                          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                            {item.icon}
+                          </span>
+                          <h3 className="mt-4 text-base font-semibold">{item.title}</h3>
+                          <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+                            {item.description}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+
+                    <Button asChild size="lg" className="mt-8 gap-2">
+                      <Link href="#stock-products">
+                        Daha fazla keşfedin
+                        <ArrowRight className="h-5 w-5" />
+                      </Link>
+                    </Button>
+                  </div>
+                </div>
+              </section>
+            )
+          }
+
+          return (
+            <section
+              key={section.id}
+              id={section.id}
+              className="scroll-mt-28 border-t border-border/60 py-16 md:py-24"
+            >
+              <div className="grid items-center gap-10 md:grid-cols-2 md:gap-14 lg:gap-20">
               {/* Media */}
               <div className={section.imageOnLeft ? "md:order-1" : "md:order-2"}>
                 <div className="relative overflow-hidden rounded-[2rem] bg-primary/10 p-4 sm:p-6">
@@ -310,10 +393,11 @@ export default function PresentationPage() {
                   ))}
                 </ul>
               </div>
-            </div>
-          </section>
-        ))}
-      </div>
+              </div>
+            </section>
+          )
+        })}
+        </div>
 
       {/* Services grid */}
       <section id="services" className="scroll-mt-28 px-3 pb-20 pt-4 sm:px-5">
