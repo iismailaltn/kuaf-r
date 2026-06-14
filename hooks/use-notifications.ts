@@ -100,6 +100,7 @@ export function useNotifications({
   return {
     notifications,
     unreadCount,
+    unreadIds,
     markAsRead,
     markAllAsRead,
     clearAll,

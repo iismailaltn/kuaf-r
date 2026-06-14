@@ -118,3 +118,54 @@ export function getNotificationColor(type: NotificationType): string {
       return "bg-primary"
   }
 }
+
+/**
+ * Soft, tinted icon container styles (background + foreground) for a modern look.
+ */
+export function getNotificationTone(type: NotificationType): string {
+  switch (type) {
+    case "session":
+      return "bg-blue-500/10 text-blue-600 dark:text-blue-400"
+    case "product":
+      return "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+    case "review":
+      return "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+    case "reservation":
+      return "bg-primary/10 text-primary"
+    default:
+      return "bg-muted text-muted-foreground"
+  }
+}
+
+/**
+ * Accent color used for the unread dot / left rail per notification type.
+ */
+export function getNotificationAccent(type: NotificationType): string {
+  switch (type) {
+    case "session":
+      return "bg-blue-500"
+    case "product":
+      return "bg-emerald-500"
+    case "review":
+      return "bg-amber-500"
+    case "reservation":
+      return "bg-primary"
+    default:
+      return "bg-muted-foreground"
+  }
+}
+
+export function getNotificationTypeLabel(type: NotificationType): string {
+  switch (type) {
+    case "session":
+      return "Seans"
+    case "product":
+      return "Ürün"
+    case "review":
+      return "Yorum"
+    case "reservation":
+      return "Rezervasyon"
+    default:
+      return "Bildirim"
+  }
+}

@@ -31,6 +31,7 @@ export function Header({
   const {
     notifications,
     unreadCount,
+    unreadIds,
     markAsRead,
     markAllAsRead,
     clearAll,
@@ -52,6 +53,7 @@ export function Header({
         <NotificationDropdown
           notifications={notifications}
           unreadCount={unreadCount}
+          unreadIds={unreadIds}
           onMarkAsRead={markAsRead}
           onMarkAllAsRead={markAllAsRead}
           onClearAll={clearAll}
