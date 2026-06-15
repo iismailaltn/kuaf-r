@@ -1,108 +1,112 @@
 "use client"
 
+import { useEffect } from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { Button } from "@/components/ui/button"
+import { Fraunces } from "next/font/google"
 import {
   ArrowLeft,
   ArrowRight,
+  ArrowUpRight,
   CalendarCheck2,
-  CheckCircle2,
-  Clock,
-  Heart,
-  History,
   Instagram,
   Package,
   Play,
-  Quote,
   Scissors,
-  Sparkles,
   Star,
   TrendingUp,
   UserPlus,
   Users,
 } from "lucide-react"
+import "./presentation.css"
 
-interface PresentationSection {
+const display = Fraunces({
+  subsets: ["latin"],
+  weight: ["400", "500"],
+  style: ["normal", "italic"],
+  display: "swap",
+})
+
+interface FeatureBlock {
   id: string
+  no: string
   eyebrow: string
   title: string
   description: string
-  imageOnLeft: boolean
+  reverse: boolean
   image: string
-  icon: React.ReactNode
   features: string[]
   stat: { value: string; label: string }
 }
 
-const sections: PresentationSection[] = [
+const features: FeatureBlock[] = [
   {
     id: "work-areas",
+    no: "01",
     eyebrow: "Çalışma Alanları",
-    title: "Her koltuğu, her saati kontrol altında tutun",
+    title: "Her koltuk, her saat kontrol altında",
     description:
-      "Salonunuzdaki çalışma alanlarını tek ekrandan yönetin. Her alana personel atayın, çalışma saatlerini belirleyin ve randevuları organize edin. Sistem ekibinizin müsaitliğini otomatik takip eder.",
-    imageOnLeft: false,
+      "Salonunuzdaki çalışma alanlarını tek ekrandan yönetin. Personel atayın, çalışma saatlerini belirleyin ve randevuları organize edin. Sistem ekibinizin müsaitliğini otomatik takip eder.",
+    reverse: false,
     image: "/presentation/work-areas.png",
-    icon: <CalendarCheck2 className="h-5 w-5" />,
     features: [
       "Çalışma alanı oluşturma ve düzenleme",
       "Personel atama ve yönetimi",
       "Çalışma saatlerini belirleme",
       "Gerçek zamanlı müsaitlik takibi",
     ],
-    stat: { value: "%0", label: "çakışan randevu" },
+    stat: { value: "%0", label: "Çakışan randevu" },
   },
   {
     id: "stock-products",
+    no: "02",
     eyebrow: "Stok ve Ürünler",
     title: "Ürünleri ve geliri tek bakışta görün",
     description:
       "Ürünlerinizin stok durumunu takip edin, satışları kaydedin ve envanterinizi yönetin. Satışlar otomatik sisteme işlenir, gelir raporları anında oluşturulur.",
-    imageOnLeft: true,
+    reverse: true,
     image: "/presentation/stock-products.png",
-    icon: <Package className="h-5 w-5" />,
     features: [
       "Canlı ürün stok takibi",
       "Hızlı satış kaydı",
       "Otomatik gelir raporları",
       "Düşük stok uyarıları",
     ],
-    stat: { value: "Anlık", label: "gelir raporu" },
+    stat: { value: "Anlık", label: "Gelir raporu" },
   },
   {
     id: "google-reviews",
+    no: "03",
     eyebrow: "Google Yorumları",
     title: "İtibarınızı tek panelden yönetin",
     description:
       "Google İşletme Profilinizdeki yorumları otomatik çekin ve yönetin. Müşteri geri bildirimlerini takip edin, puanınızı izleyin ve memnuniyeti sürekli artırın.",
-    imageOnLeft: false,
+    reverse: false,
     image: "/presentation/google-reviews.png",
-    icon: <Star className="h-5 w-5" />,
     features: [
       "Otomatik yorum senkronizasyonu",
       "Tek ekrandan yorum yönetimi",
       "Puan ve trend takibi",
       "Memnuniyet özetleri",
     ],
-    stat: { value: "4.9★", label: "ortalama puan" },
+    stat: { value: "4.9", label: "Ortalama puan" },
   },
   {
     id: "instagram-sharing",
+    no: "04",
     eyebrow: "Instagram Paylaşımı",
     title: "Yaptığınız işi vitrine çıkarın",
     description:
       "Tamamlanan seanslardan sonra müşterilerin onayıyla Instagram'da fotoğraf paylaşın. Marka bilinirliğinizi artırın, yeni müşterilere ulaşın ve sosyal medya varlığınızı güçlendirin.",
-    imageOnLeft: true,
+    reverse: true,
     image: "/presentation/instagram-sharing.png",
-    icon: <Instagram className="h-5 w-5" />,
     features: [
       "Tek tıkla Instagram paylaşımı",
       "Müşteri onay akışı",
       "Öncesi / sonrası galerisi",
       "Marka bilinirliği artışı",
     ],
-    stat: { value: "1 tık", label: "ile paylaşım" },
+    stat: { value: "1 tık", label: "İle paylaşım" },
   },
 ]
 
@@ -139,39 +143,26 @@ const services = [
   },
 ]
 
-const customerHighlights = [
-  {
-    icon: <Heart className="h-5 w-5" />,
-    title: "Sadakat Takibi",
-    description: "Düzenli müşterilerinizi tanıyın, tercihlerini hatırlayın ve bağlılığı güçlendirin.",
-  },
-  {
-    icon: <History className="h-5 w-5" />,
-    title: "Randevu Geçmişi",
-    description: "Her müşterinin geçmiş seanslarına ve notlarına tek tıkla ulaşın.",
-  },
-]
-
 const heroStats = [
   { value: "5.000+", label: "Yönetilen randevu" },
   { value: "%98", label: "Müşteri memnuniyeti" },
-  { value: "12 sn", label: "Ortalama kayıt süresi" },
+  { value: "12 sn", label: "Ortalama kayıt" },
   { value: "7/24", label: "Erişilebilir panel" },
 ]
 
 const steps = [
   {
-    no: "01",
+    no: "I",
     title: "Salonunuzu kurun",
     description: "Çalışma alanlarınızı oluşturun, personelinizi ekleyin ve çalışma saatlerini belirleyin.",
   },
   {
-    no: "02",
+    no: "II",
     title: "Randevuları yönetin",
     description: "Müşterilerinizi kaydedin, randevuları planlayın ve günlük akışı tek ekrandan takip edin.",
   },
   {
-    no: "03",
+    no: "III",
     title: "İşletmenizi büyütün",
     description: "Yorumları, stoğu ve sosyal medyayı yönetin; raporlarla performansınızı artırın.",
   },
@@ -179,355 +170,300 @@ const steps = [
 
 const testimonials = [
   {
-    quote:
-      "Randevu karmaşası tamamen bitti. Artık tüm ekibim aynı ekrana bakıyor, çakışma yaşamıyoruz.",
+    quote: "Randevu karmaşası tamamen bitti. Artık tüm ekibim aynı ekrana bakıyor, çakışma yaşamıyoruz.",
     name: "Elif Demir",
     role: "Salon Sahibi, İstanbul",
   },
   {
-    quote:
-      "Stok takibi ve gelir raporları sayesinde hangi ürünün ne kadar sattığını anında görüyorum.",
+    quote: "Stok takibi ve gelir raporları sayesinde hangi ürünün ne kadar sattığını anında görüyorum.",
     name: "Murat Yılmaz",
     role: "İşletmeci, Ankara",
   },
   {
-    quote:
-      "Google yorumlarını ve Instagram paylaşımlarını tek yerden yönetmek bize çok zaman kazandırdı.",
+    quote: "Google yorumlarını ve Instagram paylaşımlarını tek yerden yönetmek bize çok zaman kazandırdı.",
     name: "Zeynep Kaya",
     role: "Kuaför, İzmir",
   },
 ]
 
+const marqueeItems = [
+  "Randevular",
+  "Müşteriler",
+  "Stok",
+  "Google Yorumları",
+  "Instagram",
+  "Raporlama",
+  "Personel",
+  "Gelir",
+]
+
 export default function PresentationPage() {
+  useEffect(() => {
+    const els = document.querySelectorAll<HTMLElement>(".kp-reveal")
+    if (!("IntersectionObserver" in window)) {
+      els.forEach((el) => el.classList.add("is-in"))
+      return
+    }
+    const io = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("is-in")
+            io.unobserve(entry.target)
+          }
+        })
+      },
+      { threshold: 0.12, rootMargin: "0px 0px -60px 0px" },
+    )
+    els.forEach((el) => io.observe(el))
+    return () => io.disconnect()
+  }, [])
+
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      {/* Top bar */}
-      <header className="sticky top-0 z-50 px-3 pt-3 sm:px-5 sm:pt-4">
-        <div className="mx-auto flex max-w-[1400px] items-center justify-between rounded-2xl border border-border/60 bg-card/85 px-4 py-3 shadow-sm backdrop-blur-md sm:px-6">
-          <div className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-              <Scissors className="h-5 w-5" />
-            </div>
-            <span className="font-semibold tracking-tight">Kuaför Panel</span>
-          </div>
-          <nav className="hidden items-center gap-7 text-sm font-medium text-muted-foreground lg:flex">
-            <Link href="#features" className="transition-colors hover:text-foreground">
-              Özellikler
-            </Link>
-            <Link href="#how" className="transition-colors hover:text-foreground">
-              Nasıl Çalışır
-            </Link>
-            <Link href="#testimonials" className="transition-colors hover:text-foreground">
-              Yorumlar
-            </Link>
-            <Link href="#services" className="transition-colors hover:text-foreground">
-              Çözümler
-            </Link>
+    <div className="kp" style={{ ["--font-display" as string]: display.style.fontFamily }}>
+      {/* Üst bar */}
+      <header className="kp-nav">
+        <div className="kp-shell kp-nav__inner">
+          <Link href="/" className="kp-brand">
+            <span className="kp-brand__mark">
+              <Scissors className="h-4 w-4" />
+            </span>
+            <span className="kp-brand__name">Kuaför Panel</span>
+          </Link>
+          <nav className="kp-nav__links">
+            <Link href="#features" className="kp-nav__link">Özellikler</Link>
+            <Link href="#how" className="kp-nav__link">Nasıl Çalışır</Link>
+            <Link href="#testimonials" className="kp-nav__link">Yorumlar</Link>
+            <Link href="#services" className="kp-nav__link">Çözümler</Link>
           </nav>
-          <div className="flex items-center gap-2">
-            <Button asChild variant="ghost" size="sm" className="gap-2">
-              <Link href="/">
-                <ArrowLeft className="h-4 w-4" />
-                <span className="hidden sm:inline">Panele dön</span>
-              </Link>
-            </Button>
-          </div>
+          <Link href="/" className="kp-btn kp-btn--ghost">
+            <ArrowLeft className="h-4 w-4" />
+            <span>Panele dön</span>
+          </Link>
         </div>
       </header>
 
       {/* Hero */}
-      <section className="relative overflow-hidden px-3 pt-8 sm:px-5 md:pt-12">
-        {/* backdrop */}
-        <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[520px] bg-gradient-to-b from-primary/8 to-transparent" />
-        <div className="mx-auto grid max-w-[1400px] items-center gap-10 lg:grid-cols-[1.05fr_1fr] lg:gap-10">
-          {/* Text */}
-          <div className="lg:pl-4">
-            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-1.5 text-sm font-medium text-muted-foreground shadow-sm">
-              <Sparkles className="h-4 w-4 text-primary" />
-              Salonlar için hepsi bir arada yönetim platformu
-            </div>
-            <h1 className="text-balance text-4xl font-bold leading-[1.05] tracking-tight md:text-5xl lg:text-[3.75rem]">
-              Salonunuzu yönetmenin{" "}
-              <span className="relative whitespace-nowrap">
-                <span className="relative z-10 rounded-xl bg-primary px-3 text-primary-foreground">
-                  en akıllı
-                </span>
-              </span>{" "}
-              yolu
-            </h1>
-            <p className="mt-6 max-w-xl text-pretty text-lg leading-relaxed text-muted-foreground">
-              Randevular, müşteriler, stok, Google yorumları ve Instagram paylaşımları;
-              işletmenizin ihtiyacı olan her şey tek platformda, kontrolünüz altında.
-            </p>
-
-            <div className="mt-8 flex flex-wrap items-center gap-4">
-              <Button asChild size="lg" className="gap-2 text-base">
-                <Link href="#features">
+      <section className="kp-hero">
+        <div className="kp-shell">
+          <div className="kp-hero__grid">
+            <div className="kp-reveal">
+              <span className="kp-eyebrow">Salon yönetim platformu</span>
+              <h1 className="kp__display kp-hero__title">
+                Salonunuzu yönetmenin
+                <br />
+                <em>en zarif</em> yolu.
+              </h1>
+              <p className="kp-hero__lead">
+                Randevular, müşteriler, stok, Google yorumları ve Instagram paylaşımları —
+                işletmenizin ihtiyacı olan her şey tek bir sakin panelde, kontrolünüz altında.
+              </p>
+              <div className="kp-hero__actions">
+                <Link href="#features" className="kp-btn kp-btn--solid">
                   Özellikleri keşfedin
-                  <ArrowRight className="h-5 w-5" />
+                  <ArrowRight className="h-4 w-4" />
                 </Link>
-              </Button>
-              <Link
-                href="#how"
-                className="group flex items-center gap-3 text-sm font-medium text-foreground"
-              >
-                <span className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-primary text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
-                  <Play className="h-5 w-5" />
-                </span>
-                Nasıl çalışır?
-              </Link>
-            </div>
-
-            {/* Social proof */}
-            <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3">
-              <div className="flex items-center gap-1.5">
-                <div className="flex">
-                  {[0, 1, 2, 3, 4].map((i) => (
-                    <Star key={i} className="h-4 w-4 fill-primary text-primary" />
-                  ))}
-                </div>
-                <span className="text-sm font-medium">4.9/5 memnuniyet</span>
+                <Link href="#how" className="kp-link-play">
+                  <span className="kp-link-play__circle">
+                    <Play className="h-4 w-4" />
+                  </span>
+                  Nasıl çalışır?
+                </Link>
               </div>
-              <div className="h-4 w-px bg-border" />
-              <span className="text-sm text-muted-foreground">
-                Türkiye genelinde <span className="font-semibold text-foreground">200+</span> salon kullanıyor
-              </span>
+              <div className="kp-hero__proof">
+                <span className="kp-stars">
+                  {[0, 1, 2, 3, 4].map((i) => (
+                    <Star key={i} className="h-4 w-4 fill-current" />
+                  ))}
+                </span>
+                <span><strong>4.9/5</strong> memnuniyet</span>
+                <span className="kp-proof__sep" />
+                <span>
+                  Türkiye genelinde <strong>200+</strong> salon kullanıyor
+                </span>
+              </div>
             </div>
-          </div>
 
-          {/* Visual */}
-          <div className="relative">
-            <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-primary/15 to-primary/5 p-4 sm:p-6">
-              <div className="absolute -right-12 -top-12 h-52 w-52 rounded-full bg-primary/15" />
-              <div className="relative overflow-hidden rounded-2xl border border-border bg-card shadow-2xl shadow-primary/10">
+            <div className="kp-hero__media kp-reveal">
+              <div className="kp-frame">
                 <Image
                   src="/presentation/hero-dashboard.png"
                   alt="Kuaför Panel kontrol paneli önizlemesi"
                   width={1600}
                   height={900}
                   priority
-                  className="h-auto w-full"
                 />
               </div>
-
-              {/* Floating stat cards */}
-              <div className="absolute right-6 top-10 flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3 shadow-lg">
-                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <TrendingUp className="h-5 w-5" />
+              <div className="kp-tag kp-tag--tr">
+                <span className="kp-tag__icon">
+                  <TrendingUp className="h-4 w-4" />
                 </span>
-                <div>
-                  <div className="text-xs text-muted-foreground">Aylık Gelir</div>
-                  <div className="text-sm font-bold">₺128K</div>
-                </div>
+                <span>
+                  <span className="kp-tag__k">Aylık gelir</span>
+                  <br />
+                  <span className="kp-tag__v">₺128K</span>
+                </span>
               </div>
-              <div className="absolute bottom-10 left-6 flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3 shadow-lg">
-                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <UserPlus className="h-5 w-5" />
+              <div className="kp-tag kp-tag--bl">
+                <span className="kp-tag__icon">
+                  <UserPlus className="h-4 w-4" />
                 </span>
-                <div>
-                  <div className="text-xs text-muted-foreground">Yeni Müşteri</div>
-                  <div className="text-sm font-bold">+340</div>
-                </div>
+                <span>
+                  <span className="kp-tag__k">Yeni müşteri</span>
+                  <br />
+                  <span className="kp-tag__v">+340</span>
+                </span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Stat band */}
-        <div className="mx-auto mt-12 max-w-[1400px] md:mt-16">
-          <div className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-border bg-border md:grid-cols-4">
+        {/* Marquee */}
+        <div className="kp-marquee" aria-hidden="true">
+          <div className="kp-marquee__track">
+            {[...marqueeItems, ...marqueeItems].map((item, i) => (
+              <span key={i} className="kp-marquee__item">
+                {item}
+                <span>✳</span>
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {/* İstatistik bandı */}
+        <div className="kp-shell">
+          <div className="kp-stats">
             {heroStats.map((s) => (
-              <div key={s.label} className="bg-card px-6 py-6 text-center">
-                <div className="text-2xl font-bold tracking-tight md:text-3xl">{s.value}</div>
-                <div className="mt-1 text-sm text-muted-foreground">{s.label}</div>
+              <div key={s.label} className="kp-stat kp-reveal">
+                <div className="kp-stat__v">{s.value}</div>
+                <div className="kp-stat__l">{s.label}</div>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Customers (arched) */}
-      <section id="customers" className="scroll-mt-28 px-3 py-16 sm:px-5 md:py-24">
-        <div className="mx-auto grid max-w-[1400px] items-center gap-10 md:grid-cols-2 md:gap-14 lg:gap-20">
-          <div className="md:order-1">
-            <div className="relative mx-auto max-w-md">
-              <div className="absolute inset-0 -z-10 translate-x-4 translate-y-4 rounded-[10rem_10rem_2rem_2rem] bg-primary/15" />
-              <div className="overflow-hidden rounded-[10rem_10rem_2rem_2rem] border border-border bg-card shadow-xl shadow-primary/10">
+      {/* Müşteriler */}
+      <section id="customers" className="kp-section kp-section--line">
+        <div className="kp-shell">
+          <div className="kp-feature kp-feature--rev">
+            <div className="kp-feature__media kp-reveal">
+              <div className="kp-frame">
                 <Image
                   src="/presentation/customers.png"
                   alt="Müşteri yönetimi ekran görüntüsü"
-                  width={900}
-                  height={1100}
-                  className="h-full w-full object-cover"
+                  width={1280}
+                  height={900}
                 />
               </div>
             </div>
-          </div>
-
-          <div className="md:order-2">
-            <div className="mb-5 inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary">
-              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/15">
-                <Users className="h-4 w-4" />
+            <div className="kp-reveal">
+              <span className="kp-eyebrow">
+                <span className="kp-eyebrow__no">00</span> Müşteriler
               </span>
-              Müşteriler
-            </div>
-            <h2 className="text-balance text-3xl font-bold leading-tight tracking-tight md:text-4xl">
-              Müşterilerinizi{" "}
-              <span className="rounded-lg bg-primary px-2 text-primary-foreground">tanıyın</span>,
-              sadakatlerini kazanın
-            </h2>
-            <p className="mt-4 text-pretty text-lg leading-relaxed text-muted-foreground">
-              Tüm müşteri veritabanınızı tek yerden yönetin. Bilgileri kaydedin, randevu geçmişini görün
-              ve her müşteri için detaylı profil oluşturarak ilişkilerinizi güçlendirin.
-            </p>
-            <div className="mt-8 grid gap-6 sm:grid-cols-2">
-              {customerHighlights.map((item) => (
-                <div key={item.title}>
-                  <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                    {item.icon}
-                  </span>
-                  <h3 className="mt-4 text-base font-semibold">{item.title}</h3>
-                  <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
-                    {item.description}
-                  </p>
-                </div>
-              ))}
+              <h2 className="kp__display kp-feature__title">
+                Müşterilerinizi tanıyın, sadakatlerini kazanın
+              </h2>
+              <p className="kp-feature__lead">
+                Tüm müşteri veritabanınızı tek yerden yönetin. Bilgileri kaydedin, randevu geçmişini görün
+                ve her müşteri için detaylı profil oluşturarak ilişkilerinizi güçlendirin.
+              </p>
+              <ul className="kp-list">
+                <li><span className="kp-list__no">a</span> Detaylı müşteri profilleri ve notlar</li>
+                <li><span className="kp-list__no">b</span> Tek tıkla randevu geçmişine erişim</li>
+                <li><span className="kp-list__no">c</span> Sadakat ve tercih takibi</li>
+              </ul>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Feature sections */}
-      <div id="features" className="mx-auto max-w-[1400px] scroll-mt-28 px-3 sm:px-5">
-        {sections.map((section) => (
-          <section
-            key={section.id}
-            id={section.id}
-            className="scroll-mt-28 border-t border-border/60 py-16 md:py-24"
-          >
-            <div className="grid items-center gap-10 md:grid-cols-2 md:gap-14 lg:gap-20">
-              {/* Media */}
-              <div className={section.imageOnLeft ? "md:order-1" : "md:order-2"}>
-                <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-primary/15 to-primary/5 p-4 sm:p-6">
-                  <div className="absolute -left-10 -top-10 h-40 w-40 rounded-full bg-primary/15" />
-                  <div className="relative overflow-hidden rounded-2xl border border-border bg-card shadow-xl shadow-primary/5">
-                    <Image
-                      src={section.image || "/placeholder.svg"}
-                      alt={`${section.eyebrow} ekran görüntüsü`}
-                      width={1280}
-                      height={800}
-                      className="h-auto w-full"
-                    />
-                  </div>
-                  {/* mini stat chip */}
-                  <div className="absolute bottom-8 right-8 rounded-xl border border-border bg-card px-4 py-2.5 shadow-lg">
-                    <div className="text-lg font-bold leading-none text-primary">{section.stat.value}</div>
-                    <div className="mt-1 text-xs text-muted-foreground">{section.stat.label}</div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Text */}
-              <div className={section.imageOnLeft ? "md:order-2" : "md:order-1"}>
-                <div className="mb-5 inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary">
-                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/15">
-                    {section.icon}
-                  </span>
-                  {section.eyebrow}
-                </div>
-                <h2 className="text-balance text-3xl font-bold tracking-tight md:text-4xl">
-                  {section.title}
-                </h2>
-                <p className="mt-4 text-pretty text-lg leading-relaxed text-muted-foreground">
-                  {section.description}
-                </p>
-                <ul className="mt-6 grid gap-3 sm:grid-cols-2">
-                  {section.features.map((feature) => (
-                    <li key={feature} className="flex items-start gap-3">
-                      <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
-                      <span className="text-foreground/90">{feature}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </section>
-        ))}
-      </div>
-
-      {/* How it works */}
-      <section id="how" className="scroll-mt-28 px-3 py-16 sm:px-5 md:py-24">
-        <div className="mx-auto max-w-[1400px]">
-          <div className="max-w-2xl">
-            <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary">
-              <Clock className="h-4 w-4" />
-              Nasıl Çalışır
-            </div>
-            <h2 className="text-balance text-3xl font-bold tracking-tight md:text-4xl">
-              Üç adımda salonunuzu dijitalleştirin
-            </h2>
-            <p className="mt-4 text-pretty text-lg text-muted-foreground">
-              Kurulumdan büyümeye kadar her şey basit ve hızlı.
-            </p>
+      {/* Özellikler */}
+      <section id="features" className="kp-section kp-section--line">
+        <div className="kp-shell">
+          <div className="kp-head kp-reveal">
+            <span className="kp-eyebrow">Özellikler</span>
+            <h2 className="kp__display kp-head__title">Salonunuzun her köşesi için bir çözüm</h2>
           </div>
 
-          <div className="mt-12 grid gap-5 md:grid-cols-3">
-            {steps.map((step) => (
-              <div
-                key={step.no}
-                className="group relative overflow-hidden rounded-2xl border border-border bg-card p-7 transition-colors hover:border-primary/40"
+          <div style={{ marginTop: "72px" }}>
+            {features.map((f) => (
+              <article
+                key={f.id}
+                id={f.id}
+                className={`kp-feature${f.reverse ? " kp-feature--rev" : ""}`}
+                style={{ scrollMarginTop: "88px" }}
               >
-                <span className="text-5xl font-bold tracking-tight text-primary/15 transition-colors group-hover:text-primary/25">
-                  {step.no}
-                </span>
-                <h3 className="mt-3 text-xl font-semibold">{step.title}</h3>
-                <p className="mt-2 text-pretty leading-relaxed text-muted-foreground">
-                  {step.description}
-                </p>
+                <div className="kp-feature__media kp-reveal">
+                  <div className="kp-frame">
+                    <Image
+                      src={f.image || "/placeholder.svg"}
+                      alt={`${f.eyebrow} ekran görüntüsü`}
+                      width={1280}
+                      height={800}
+                    />
+                  </div>
+                  <div className="kp-chip">
+                    <div className="kp-chip__v">{f.stat.value}</div>
+                    <div className="kp-chip__l">{f.stat.label}</div>
+                  </div>
+                </div>
+                <div className="kp-reveal">
+                  <span className="kp-eyebrow">
+                    <span className="kp-eyebrow__no">{f.no}</span> {f.eyebrow}
+                  </span>
+                  <h3 className="kp__display kp-feature__title">{f.title}</h3>
+                  <p className="kp-feature__lead">{f.description}</p>
+                  <ul className="kp-list">
+                    {f.features.map((feature, i) => (
+                      <li key={feature}>
+                        <span className="kp-list__no">{String(i + 1).padStart(2, "0")}</span>
+                        {feature}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Nasıl çalışır */}
+      <section id="how" className="kp-section kp-section--line">
+        <div className="kp-shell">
+          <div className="kp-head kp-reveal">
+            <span className="kp-eyebrow">Nasıl Çalışır</span>
+            <h2 className="kp__display kp-head__title">Üç adımda salonunuzu dijitalleştirin</h2>
+            <p className="kp-head__lead">Kurulumdan büyümeye kadar her şey basit, sakin ve hızlı.</p>
+          </div>
+          <div className="kp-steps">
+            {steps.map((step) => (
+              <div key={step.no} className="kp-step kp-reveal">
+                <div className="kp-step__no">{step.no}</div>
+                <h3 className="kp-step__title">{step.title}</h3>
+                <p className="kp-step__lead">{step.description}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Testimonials */}
-      <section id="testimonials" className="scroll-mt-28 px-3 pb-16 sm:px-5 md:pb-24">
-        <div className="mx-auto max-w-[1400px]">
-          <div className="mx-auto max-w-2xl text-center">
-            <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary">
-              <Heart className="h-4 w-4" />
-              Müşteri Yorumları
-            </div>
-            <h2 className="text-balance text-3xl font-bold tracking-tight md:text-4xl">
-              Salonlar Kuaför Panel ile büyüyor
-            </h2>
+      {/* Yorumlar */}
+      <section id="testimonials" className="kp-section kp-section--line">
+        <div className="kp-shell">
+          <div className="kp-head kp-reveal">
+            <span className="kp-eyebrow">Müşteri Yorumları</span>
+            <h2 className="kp__display kp-head__title">Salonlar Kuaför Panel ile büyüyor</h2>
           </div>
-
-          <div className="mt-12 grid gap-5 md:grid-cols-3">
+          <div className="kp-quotes">
             {testimonials.map((t) => (
-              <figure
-                key={t.name}
-                className="flex flex-col rounded-2xl border border-border bg-card p-7"
-              >
-                <Quote className="h-8 w-8 text-primary/30" />
-                <blockquote className="mt-4 flex-1 text-pretty leading-relaxed text-foreground/90">
-                  {t.quote}
-                </blockquote>
-                <div className="mt-5 flex">
-                  {[0, 1, 2, 3, 4].map((i) => (
-                    <Star key={i} className="h-4 w-4 fill-primary text-primary" />
-                  ))}
-                </div>
-                <figcaption className="mt-4 border-t border-border pt-4">
-                  <div className="flex items-center gap-3">
-                    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
-                      {t.name.charAt(0)}
-                    </span>
-                    <div>
-                      <div className="text-sm font-semibold">{t.name}</div>
-                      <div className="text-xs text-muted-foreground">{t.role}</div>
-                    </div>
-                  </div>
+              <figure key={t.name} className="kp-quote kp-reveal">
+                <div className="kp-quote__mark">“</div>
+                <blockquote className="kp-quote__body">{t.quote}</blockquote>
+                <figcaption className="kp-quote__foot">
+                  <div className="kp-quote__name">{t.name}</div>
+                  <div className="kp-quote__role">{t.role}</div>
                 </figcaption>
               </figure>
             ))}
@@ -535,74 +471,62 @@ export default function PresentationPage() {
         </div>
       </section>
 
-      {/* Services grid */}
-      <section id="services" className="scroll-mt-28 px-3 pb-20 pt-4 sm:px-5">
-        <div className="mx-auto max-w-[1400px] rounded-[2.5rem] bg-primary px-5 py-16 text-primary-foreground sm:px-10 md:py-20">
-          <div className="mx-auto max-w-2xl text-center">
-            <span className="text-sm font-semibold uppercase tracking-wide text-primary-foreground/80">
-              Neler Sunuyoruz
-            </span>
-            <h2 className="mt-3 text-balance text-3xl font-bold tracking-tight md:text-4xl">
-              Tek platform, eksiksiz salon yönetimi
-            </h2>
-            <p className="mx-auto mt-4 text-pretty text-primary-foreground/85">
-              İşletmenizi büyütmek için ihtiyaç duyduğunuz tüm araçlar tek bir yerde.
-            </p>
-          </div>
-
-          <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {services.map((service) => (
-              <div
-                key={service.title}
-                className="rounded-2xl border border-primary-foreground/15 bg-primary-foreground/10 p-6 backdrop-blur-sm transition-colors hover:bg-primary-foreground/15"
-              >
-                <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary-foreground/15 text-primary-foreground">
-                  {service.icon}
-                </span>
-                <h3 className="mt-5 text-lg font-semibold">{service.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-primary-foreground/80">
-                  {service.description}
-                </p>
-              </div>
-            ))}
+      {/* Hizmetler */}
+      <section id="services" className="kp-section">
+        <div className="kp-shell">
+          <div className="kp-services kp-reveal">
+            <div className="kp-head kp-services__head" style={{ maxWidth: "44rem" }}>
+              <span className="kp-eyebrow">Neler Sunuyoruz</span>
+              <h2 className="kp__display kp-head__title">Tek platform, eksiksiz salon yönetimi</h2>
+            </div>
+            <div className="kp-services__grid">
+              {services.map((service, i) => (
+                <div key={service.title} className="kp-svc">
+                  <div className="kp-svc__no">{String(i + 1).padStart(2, "0")}</div>
+                  <div className="kp-svc__icon">{service.icon}</div>
+                  <h3 className="kp-svc__title">{service.title}</h3>
+                  <p className="kp-svc__lead">{service.description}</p>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </section>
 
       {/* CTA */}
-      <section id="cta" className="scroll-mt-28 px-3 pb-24 sm:px-5">
-        <div className="relative mx-auto max-w-[1400px] overflow-hidden rounded-[2rem] border border-border bg-card px-6 py-16 text-center sm:px-10">
-          <div className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-primary/10" />
-          <div className="pointer-events-none absolute -bottom-16 -left-16 h-56 w-56 rounded-full bg-primary/10" />
-          <div className="relative">
-            <h2 className="text-balance text-3xl font-bold tracking-tight md:text-4xl">
+      <section id="cta" className="kp-cta">
+        <div className="kp-shell">
+          <div className="kp-reveal">
+            <span className="kp-eyebrow" style={{ justifyContent: "center" }}>Başlayalım</span>
+            <h2 className="kp__display kp-cta__title">
               Salonunuzu dijital çağa taşımaya hazır mısınız?
             </h2>
-            <p className="mx-auto mt-4 max-w-2xl text-pretty text-lg text-muted-foreground">
+            <p className="kp-cta__lead">
               Randevular, müşteriler, stok ve sosyal medya yönetimini tek platformda birleştirin.
               Tüm ekibiniz aynı sistemde, her şey kontrol altında.
             </p>
-            <div className="mt-8 flex flex-wrap justify-center gap-3">
-              <Button asChild size="lg" className="gap-2 text-base">
-                <Link href="/">
-                  Panele git
-                  <ArrowRight className="h-5 w-5" />
-                </Link>
-              </Button>
+            <div className="kp-cta__actions">
+              <Link href="/" className="kp-btn kp-btn--solid">
+                Panele git
+                <ArrowUpRight className="h-4 w-4" />
+              </Link>
+              <Link href="#features" className="kp-btn kp-btn--ghost">
+                Özellikleri incele
+              </Link>
             </div>
           </div>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-border py-8">
-        <div className="mx-auto flex max-w-[1400px] flex-col items-center justify-between gap-3 px-5 text-sm text-muted-foreground sm:flex-row">
-          <div className="flex items-center gap-2">
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+      <footer className="kp-footer">
+        <div className="kp-shell kp-footer__inner">
+          <Link href="/" className="kp-brand">
+            <span className="kp-brand__mark">
               <Scissors className="h-4 w-4" />
-            </div>
-            <span className="font-medium text-foreground">Kuaför Panel</span>
-          </div>
+            </span>
+            <span className="kp-brand__name" style={{ fontSize: "16px" }}>Kuaför Panel</span>
+          </Link>
           <p>© {new Date().getFullYear()} Kuaför Panel Sistemi. Tüm hakları saklıdır.</p>
         </div>
       </footer>
